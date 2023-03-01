@@ -3,6 +3,7 @@ pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./IAdapter.sol";
+import "./IAdapter.sol";
 
 interface IMarket {
   struct Lend {
@@ -19,9 +20,8 @@ interface IMarket {
     address renter;
     uint96 startTime;
     address guarantor;
-    uint120 balance;
     uint120 guarantBalance;
-    uint16 guarantFee;
+    uint16 guarantFee; // (1/x)%
   }
 
   function rent(uint96 lendId) external;
@@ -38,10 +38,8 @@ interface IMarket {
 
   function claim(uint96 lendId) external;
 
-  function unlockToken(uint96 lendId) external;
-
   function registerToLend(
-    address adapter,
+    IAdapter adapter,
     address token,
     address payment,
     uint120 pricePerSec,
@@ -76,7 +74,7 @@ interface IMarket {
       uint120 pricePerSec,
       uint120 totalPrice,
       bool autoReRegister,
-      bytes calldata data
+      bytes memory data
     );
 
   function rentCondition(
@@ -89,6 +87,6 @@ interface IMarket {
       uint120 pricePerSec,
       uint120 totalPrice,
       bool autoReRegister,
-      bytes calldata data
+      bytes memory data
     );
 }

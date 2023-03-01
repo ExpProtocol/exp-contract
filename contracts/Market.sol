@@ -28,28 +28,130 @@ contract Market is IMarket, Context, EIP712 {
 
   constructor() EIP712("EXP-Market", "1") {}
 
-  function _blockTimeStamp() private returns (uint96) {
+  function _blockTimeStamp() private view returns (uint96) {
     return uint96(block.timestamp);
   }
 
-  function rent(uint96 lendId) public {
+  function _isBorrowabe(Lend memory lend) private view returns (bool) {
+    return
+      lend.adapter.isBorrowable(
+        address(this),
+        _msgSender(),
+        lend.token,
+        lend.data
+      );
+  }
+
+  function _isReturnable(uint96 lendId) private view returns (bool) {
     Lend memory lend = lends[lendId];
-    require(lend.lender != address(0), "Lend not found");
-    require(rentContracts[lendId].renter == address(0), "Already rented");
-    require(
-      lend.adapter.isBorrowable(_msgSender(), lend.token, lend.data),
-      "Not borrowable"
+    RentContract memory rentContract = rentContracts[lendId];
+    return
+      lend.adapter.isReturnable(
+        address(this),
+        _msgSender(),
+        lend.token,
+        lend.data
+      ) && rentContract.renter == _msgSender();
+  }
+
+  function returnToken(uint96 lendId) public {
+    Lend memory lend = lends[lendId];
+    RentContract memory rentContract = rentContracts[lendId];
+    uint96 rentTime = _blockTimeStamp() - rentContract.startTime;
+    uint120 rentFee = rentTime * lend.pricePerSec;
+    require(rentContract.renter == _msgSender(), "Not renter");
+    require(lend.totalPrice > rentFee, "Already overtime");
+    require(_isReturnable(lendId), "Not returnable");
+
+    (bool succsess, ) = address(lend.adapter).delegatecall(
+      abi.encodeWithSignature(
+        "returnTransfer(address,address,address,address,bool,bytes)",
+        address(this),
+        lend.lender,
+        lend.token,
+        _msgSender(),
+        lend.autoReRegister,
+        lend.data
+      )
     );
-    lend.payment.transferFrom(_msgSender(), lend.lender, lend.totalPrice);
-    lend.adapter.lendTransfer(lend.lender, lend.token, _msgSender(), lend.data);
+
+    require(succsess, "returnTransfer failed");
+
+    uint120 totalReturn = lend.totalPrice - rentFee;
+    uint120 shoudReturnForGuarant = rentContract.guarantBalance +
+      rentContract.guarantBalance /
+      rentContract.guarantFee;
+    if (shoudReturnForGuarant > totalReturn) {
+      IERC20(lend.payment).transfer(rentContract.guarantor, totalReturn);
+    } else {
+      IERC20(lend.payment).transfer(
+        rentContract.guarantor,
+        shoudReturnForGuarant
+      );
+      IERC20(lend.payment).transfer(
+        rentContract.renter,
+        totalReturn - shoudReturnForGuarant
+      );
+    }
+
+    uint120 lenderEarn = lend.totalPrice > rentFee ? rentFee : lend.totalPrice;
+    IERC20(lend.payment).transfer(lend.lender, lenderEarn);
+
+    delete rentContracts[lendId];
+  }
+
+  function claim(uint96 lendId) public {
+    Lend memory lend = lends[lendId];
+    RentContract memory rentContract = rentContracts[lendId];
+    uint96 rentTime = _blockTimeStamp() - rentContract.startTime;
+    uint120 rentFee = rentTime * lend.pricePerSec;
+    require(lend.lender == _msgSender(), "Not lender");
+    require(rentFee > lend.totalPrice, "Not overtime");
+
+    IERC20(lend.payment).transfer(lend.lender, lend.totalPrice);
+
+    delete rentContracts[lendId];
+    delete lends[lendId];
+  }
+
+  function _rent(uint96 lendId, Lend memory lend) private {
+    lend.adapter.lendTransfer(
+      address(this),
+      lend.lender,
+      lend.token,
+      _msgSender(),
+      lend.data
+    );
+    (bool succsess, ) = address(lend.adapter).delegatecall(
+      abi.encodeWithSignature(
+        "lendTransfer(address,address,address,address,bytes)",
+        address(this),
+        lend.lender,
+        lend.token,
+        _msgSender(),
+        lend.data
+      )
+    );
+
+    require(succsess, "lendTransfer failed");
+
     rentContracts[lendId] = RentContract({
       renter: _msgSender(),
       startTime: _blockTimeStamp(),
       guarantor: address(0),
-      balance: lend.totalPrice,
       guarantBalance: 0,
       guarantFee: 0
     });
+  }
+
+  function rent(uint96 lendId) external {
+    Lend memory lend = lends[lendId];
+    require(lend.lender != address(0), "Lend not found");
+    require(rentContracts[lendId].renter == address(0), "Already rented");
+    require(_isBorrowabe(lend), "Not borrowable");
+    lend.payment.transferFrom(_msgSender(), lend.lender, lend.totalPrice);
+
+    _rent(lendId, lend);
   }
 
   function rentWithGuarantor(
@@ -58,14 +160,11 @@ contract Market is IMarket, Context, EIP712 {
     uint120 guarantBalance,
     uint16 guarantFee,
     bytes calldata signature
-  ) public {
+  ) external {
     Lend memory lend = lends[lendId];
     require(lend.lender != address(0), "Lend not found");
     require(rentContracts[lendId].renter == address(0), "Already rented");
-    require(
-      lend.adapter.isBorrowable(_msgSender(), lend.token, lend.data),
-      "Not borrowable"
-    );
+    require(_isBorrowabe(lend), "Not borrowable");
 
     bytes32 guarantDigest = _hashTypedDataV4(
       keccak256(
@@ -84,23 +183,10 @@ contract Market is IMarket, Context, EIP712 {
       "Invalid signature"
     );
 
-    lend.payment.transferFrom(
-      _msgSender(),
-      lend.lender,
-      lend.totalPrice - guarantBalance
-    );
+    uint120 rentPrice = lend.totalPrice - guarantBalance;
+    lend.payment.transferFrom(_msgSender(), lend.lender, rentPrice);
     lend.payment.transferFrom(guarantor, lend.lender, guarantBalance);
-
-    lend.adapter.lendTransfer(lend.lender, lend.token, _msgSender(), lend.data);
-    rentContracts[lendId] = RentContract({
-      renter: _msgSender(),
-      startTime: _blockTimeStamp(),
-      guarantor: address(0),
-      balance: lend.totalPrice,
-      guarantBalance: 0,
-      guarantFee: 0
-    });
-
+    _rent(lendId, lend);
     usedNonces[guarantor]++;
   }
 
@@ -112,9 +198,12 @@ contract Market is IMarket, Context, EIP712 {
     uint120 totalPrice,
     bool autoReRegister,
     bytes calldata data
-  ) public {
+  ) external {
     require(adapter.isValidData(data), "Invalid data");
-    require(adapter.isBorrowable(_msgSender(), token, data), "Not borrowable");
+    require(
+      adapter.isBorrowable(address(this), _msgSender(), token, data),
+      "Not borrowable"
+    );
     lends[_totalLend] = Lend({
       lender: _msgSender(),
       adapter: IAdapter(adapter),
@@ -126,5 +215,110 @@ contract Market is IMarket, Context, EIP712 {
       data: data
     });
     _totalLend++;
+  }
+
+  function renewalLend(
+    uint96 lendId,
+    address payment,
+    uint120 pricePerSec,
+    uint120 totalPrice,
+    bool autoReRegister,
+    bytes calldata data
+  ) external {
+    Lend memory lend = lends[lendId];
+    require(lend.lender == _msgSender(), "Not lender");
+    require(rentContracts[lendId].renter == address(0), "Already rented");
+    require(lend.adapter.isValidData(data), "Invalid data");
+    require(
+      lend.adapter.isBorrowable(address(this), _msgSender(), lend.token, data),
+      "Not borrowable"
+    );
+    lends[lendId] = Lend({
+      lender: _msgSender(),
+      adapter: lend.adapter,
+      token: lend.token,
+      payment: IERC20(payment),
+      pricePerSec: pricePerSec,
+      totalPrice: totalPrice,
+      autoReRegister: autoReRegister,
+      data: data
+    });
+  }
+
+  function cancelLend(uint96 lendId) external {
+    Lend memory lend = lends[lendId];
+    require(lend.lender == _msgSender(), "Not lender");
+    require(rentContracts[lendId].renter == address(0), "Already rented");
+
+    (bool succsess, ) = address(lend.adapter).delegatecall(
+      abi.encodeWithSignature(
+        "cancelLendTransfer(address,address,address,bytes)",
+        address(this),
+        _msgSender(),
+        lend.token,
+        lend.data
+      )
+    );
+
+    require(succsess, "cancelLendTransfer failed");
+
+    delete lends[lendId];
+  }
+
+  function isBorrowable(uint96 lendId) external view returns (bool) {
+    Lend memory lend = lends[lendId];
+    return _isBorrowabe(lend);
+  }
+
+  function lendCondition(
+    uint96 lendId
+  )
+    external
+    view
+    returns (
+      address lender,
+      address adapter,
+      address token,
+      address payment,
+      uint120 pricePerSec,
+      uint120 totalPrice,
+      bool autoReRegister,
+      bytes memory data
+    )
+  {
+    Lend memory lend = lends[lendId];
+    return (
+      lend.lender,
+      address(lend.adapter),
+      lend.token,
+      address(lend.payment),
+      lend.pricePerSec,
+      lend.totalPrice,
+      lend.autoReRegister,
+      lend.data
+    );
+  }
+
+  function rentCondition(
+    uint96 lendId
+  )
+    external
+    view
+    returns (
+      address payment,
+      uint120 pricePerSec,
+      uint120 totalPrice,
+      bool autoReRegister,
+      bytes memory data
+    )
+  {
+    Lend memory lend = lends[lendId];
+    return (
+      address(lend.payment),
+      lend.pricePerSec,
+      lend.totalPrice,
+      lend.autoReRegister,
+      lend.data
+    );
   }
 }
