@@ -24,6 +24,26 @@ interface IMarket {
     uint16 guarantFee; // (1/x)%
   }
 
+  event LendRegistered(
+    uint96 indexed lendId,
+    address indexed lender,
+    address adapter,
+    address token,
+    address payment,
+    uint120 pricePerSec,
+    uint120 totalPrice,
+    bool autoReRegister,
+    bytes data
+  );
+
+  event RentStarted(
+    uint96 indexed lendId,
+    address indexed renter,
+    address indexed guarantor,
+    uint120 guarantBalance,
+    uint16 guarantFee
+  );
+
   function rent(uint96 lendId) external;
 
   function rentWithGuarantor(

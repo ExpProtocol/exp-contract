@@ -152,6 +152,8 @@ contract Market is IMarket, Context, EIP712 {
     lend.payment.transferFrom(_msgSender(), lend.lender, lend.totalPrice);
 
     _rent(lendId, lend);
+
+    emit RentStarted(lendId, _msgSender(), address(0), 0, 0);
   }
 
   function rentWithGuarantor(
@@ -186,6 +188,15 @@ contract Market is IMarket, Context, EIP712 {
     uint120 rentPrice = lend.totalPrice - guarantBalance;
     lend.payment.transferFrom(_msgSender(), lend.lender, rentPrice);
     lend.payment.transferFrom(guarantor, lend.lender, guarantBalance);
+
+    emit RentStarted(
+      lendId,
+      _msgSender(),
+      guarantor,
+      guarantBalance,
+      guarantFee
+    );
+
     _rent(lendId, lend);
     usedNonces[guarantor]++;
   }
@@ -214,6 +225,19 @@ contract Market is IMarket, Context, EIP712 {
       autoReRegister: autoReRegister,
       data: data
     });
+
+    emit LendRegistered(
+      _totalLend,
+      _msgSender(),
+      address(adapter),
+      token,
+      payment,
+      pricePerSec,
+      totalPrice,
+      autoReRegister,
+      data
+    );
+
     _totalLend++;
   }
 
@@ -243,6 +267,18 @@ contract Market is IMarket, Context, EIP712 {
       autoReRegister: autoReRegister,
       data: data
     });
+
+    emit LendRegistered(
+      lendId,
+      _msgSender(),
+      address(lend.adapter),
+      lend.token,
+      payment,
+      pricePerSec,
+      totalPrice,
+      autoReRegister,
+      data
+    );
   }
 
   function cancelLend(uint96 lendId) external {
