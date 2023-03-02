@@ -2,14 +2,14 @@
 pragma solidity ^0.8.9;
 
 import "../interfaces/IAdapter.sol";
-import "../interfaces/IIMarket.sol";
+import "../interfaces/IMarket.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 library AdapterCaller {
   function logLend(uint96 lendId, IMarket.Lend memory lend) internal {
     (bool succsess, ) = address(lend.adapter).delegatecall(
-      abi.encodeWithSignature(
-        "logLend(uint96,address,address,address,address,uint120,uint120,bool,bytes)",
+      abi.encodeWithSelector(
+        IAdapter.logLend.selector,
         lendId,
         address(this),
         lend.lender,
@@ -34,8 +34,8 @@ library AdapterCaller {
     bytes memory data
   ) internal {
     (bool succsess, ) = address(adapter).delegatecall(
-      abi.encodeWithSignature(
-        "lendTransfer(address,address,address,address,bool,bytes)",
+      abi.encodeWithSelector(
+        IAdapter.lendTransfer.selector,
         market,
         lender,
         token,
@@ -56,8 +56,8 @@ library AdapterCaller {
     bytes memory data
   ) internal {
     (bool succsess, ) = address(adapter).delegatecall(
-      abi.encodeWithSignature(
-        "cancelLendTransfer(address,address,address,bool,bytes)",
+      abi.encodeWithSelector(
+        IAdapter.cancelLendTransfer.selector,
         market,
         lender,
         token,
@@ -80,8 +80,8 @@ library AdapterCaller {
     bytes memory data
   ) internal {
     (bool succsess, ) = address(adapter).delegatecall(
-      abi.encodeWithSignature(
-        "returnTransfer(address,address,address,address,bool,bool,bytes)",
+      abi.encodeWithSelector(
+        IAdapter.returnTransfer.selector,
         market,
         lender,
         token,
