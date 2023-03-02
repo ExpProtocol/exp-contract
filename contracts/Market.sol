@@ -5,17 +5,26 @@ import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
+
 import "./interfaces/IIMarket.sol";
 import "./interfaces/IAdapter.sol";
 import "./libraries/AdapterCaller.sol";
 import "./libraries/FeeManager.sol";
 
 contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
+  //@param _totalLend 貸し板の総数
   uint96 private _totalLend;
-  uint96 public minimalRentTime = 86400; // 1 day
 
+  //@param minimalRentTime 借りれる最小単位(デフォルトは1日)
+  uint96 public minimalRentTime = 86400;
+
+  //@param lends lendIdに対して貸し板情報を持つ
   mapping(uint96 => Lend) public lends;
+
+  //@param rentContracts rendIdに対して借り板情報を持つ
   mapping(uint96 => RentContract) public rentContracts;
+
+  //@param usedNonces　連帯保証人のセキュリティ
   mapping(address => uint24) public usedNonces;
 
   bytes32 constant PROTOCOL_OWNER_ROLE = keccak256("PROTOCOL_OWNER_ROLE");
@@ -69,6 +78,8 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     RentContract memory rentContract = rentContracts[lendId];
     uint96 rentTime = _blockTimeStamp() - rentContract.startTime;
     uint120 rentFee = rentTime * lend.pricePerSec;
+
+    //@TODO 最低借りる単位が設定されてない
     require(rentContract.renter == _msgSender(), "Not renter");
     require(lend.totalPrice > rentFee, "Already overtime");
     require(_isReturnable(lendId), "Not returnable");
@@ -146,11 +157,20 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
 
   function rent(uint96 lendId) external {
     Lend memory lend = lends[lendId];
+
+    //@notice 借り手が0アドレスでない確認
     require(lend.lender != address(0), "Lend not found");
+
+    //@notice 既に借り手がいないか確認
     require(rentContracts[lendId].renter == address(0), "Already rented");
+
+    //@notice コントラクトがNFTに対してapprove権限かowner権限のどちらかを持っているか確認
     require(_isBorrowabe(lend), "Not borrowable");
+
+    //@notice 担保金額をTransferする
     lend.payment.transferFrom(_msgSender(), lend.lender, lend.totalPrice);
 
+    //@notice NFTをTransferする
     _rent(lendId, lend);
 
     emit RentStarted(lendId, _msgSender(), address(0), 0, 0);
@@ -210,11 +230,16 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     bool autoReRegister,
     bytes calldata data
   ) external {
+    //@notice トークン規格に合わせてバリデーション
     require(adapter.isValidData(data), "Invalid data");
+
+    //@notice コントラクトがNFTに対してapprove権限かowner権限のどちらかを持っているか確認
     require(
       adapter.isBorrowable(address(this), _msgSender(), token, data),
       "Not borrowable"
     );
+
+    //@notice 借り板を作成
     lends[_totalLend] = Lend({
       lender: _msgSender(),
       adapter: IAdapter(adapter),
@@ -226,6 +251,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
       data: data
     });
 
+    //@notice ユーザーフレンドリーなイベント発行
     AdapterCaller.logLend(_totalLend, lends[_totalLend]);
 
     emit LendRegistered(
@@ -243,6 +269,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     _totalLend++;
   }
 
+  //@notice 借り板の再設定関数
   function renewalLend(
     uint96 lendId,
     address payment,
@@ -300,6 +327,10 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
 
     delete lends[lendId];
   }
+
+  //
+  //VIEW
+  //
 
   function isBorrowable(uint96 lendId) external view returns (bool) {
     Lend memory lend = lends[lendId];
