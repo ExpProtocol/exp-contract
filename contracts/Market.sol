@@ -1,19 +1,24 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "./interfaces/IIMarket.sol";
 import "./interfaces/IAdapter.sol";
 import "./libraries/AdapterCaller.sol";
+import "./libraries/FeeManager.sol";
 
-contract Market is IMarket, Context, EIP712 {
+contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
   uint96 private _totalLend;
+  uint96 public minimalRentTime = 86400; // 1 day
+
   mapping(uint96 => Lend) public lends;
   mapping(uint96 => RentContract) public rentContracts;
   mapping(address => uint24) public usedNonces;
+
+  bytes32 constant PROTOCOL_OWNER_ROLE = keccak256("PROTOCOL_OWNER_ROLE");
 
   bytes32 constant GUARANT_REQUEST_TYPE_HASH =
     keccak256(
@@ -27,7 +32,11 @@ contract Market is IMarket, Context, EIP712 {
       )
     );
 
-  constructor() EIP712("EXP-Market", "1") {}
+  constructor() EIP712("EXP-Market", "1") {
+    _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
+    _setupRole(PROTOCOL_OWNER_ROLE, _msgSender());
+    _setupRole(TREASURY_ROLE, _msgSender());
+  }
 
   function _blockTimeStamp() private view returns (uint96) {
     return uint96(block.timestamp);
@@ -91,8 +100,9 @@ contract Market is IMarket, Context, EIP712 {
       );
     }
 
-    uint120 lenderEarn = lend.totalPrice > rentFee ? rentFee : lend.totalPrice;
-    IERC20(lend.payment).transfer(lend.lender, lenderEarn);
+    uint256 lenderEarn = lend.totalPrice > rentFee ? rentFee : lend.totalPrice;
+    uint256 fee = _collectFee(lend.payment, lenderEarn);
+    IERC20(lend.payment).transfer(lend.lender, lenderEarn - fee);
 
     emit RentReturned(lendId, _msgSender());
 
@@ -107,7 +117,9 @@ contract Market is IMarket, Context, EIP712 {
     require(lend.lender == _msgSender(), "Not lender");
     require(rentFee > lend.totalPrice, "Not overtime");
 
-    IERC20(lend.payment).transfer(lend.lender, lend.totalPrice);
+    uint256 totalPrice = lend.totalPrice;
+    uint256 fee = _collectFee(lend.payment, totalPrice);
+    IERC20(lend.payment).transfer(lend.lender, totalPrice - fee);
 
     delete rentContracts[lendId];
     delete lends[lendId];
@@ -340,5 +352,18 @@ contract Market is IMarket, Context, EIP712 {
       lend.autoReRegister,
       lend.data
     );
+  }
+
+  function updateMinimalRentTime(
+    uint96 minimalRentTime_
+  ) external onlyRole(PROTOCOL_OWNER_ROLE) {
+    emit MinimumRentTimeUpdated(minimalRentTime, minimalRentTime_);
+    minimalRentTime = minimalRentTime_;
+  }
+
+  function updateRentFee(
+    uint16 rentFee_
+  ) external onlyRole(PROTOCOL_OWNER_ROLE) {
+    _updateProtocolFee(rentFee_);
   }
 }

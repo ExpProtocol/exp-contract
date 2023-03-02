@@ -2,10 +2,11 @@
 pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/IAccessControlEnumerable.sol";
 import "./IAdapter.sol";
 import "./IAdapter.sol";
 
-interface IMarket {
+interface IMarket is IAccessControlEnumerable {
   struct Lend {
     address lender;
     IAdapter adapter;
@@ -45,6 +46,11 @@ interface IMarket {
   );
 
   event RentReturned(uint96 indexed lendId, address indexed renter);
+
+  event MinimumRentTimeUpdated(
+    uint96 oldMinimumRentTime,
+    uint96 newMinimumRentTime
+  );
 
   function rent(uint96 lendId) external;
 
