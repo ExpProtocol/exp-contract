@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IIMarket.sol";
 import "./interfaces/IAdapter.sol";
+import "./libraries/AdapterCaller.sol";
 
 contract Market is IMarket, Context, EIP712 {
   uint96 private _totalLend;
@@ -63,19 +64,15 @@ contract Market is IMarket, Context, EIP712 {
     require(lend.totalPrice > rentFee, "Already overtime");
     require(_isReturnable(lendId), "Not returnable");
 
-    (bool succsess, ) = address(lend.adapter).delegatecall(
-      abi.encodeWithSignature(
-        "returnTransfer(address,address,address,address,bool,bytes)",
-        address(this),
-        lend.lender,
-        lend.token,
-        _msgSender(),
-        lend.autoReRegister,
-        lend.data
-      )
+    AdapterCaller.returnTransfer(
+      lend.adapter,
+      address(this),
+      lend.lender,
+      lend.token,
+      _msgSender(),
+      lend.autoReRegister,
+      lend.data
     );
-
-    require(succsess, "returnTransfer failed");
 
     uint120 totalReturn = lend.totalPrice - rentFee;
     uint120 shoudReturnForGuarant = rentContract.guarantBalance +
@@ -97,6 +94,8 @@ contract Market is IMarket, Context, EIP712 {
     uint120 lenderEarn = lend.totalPrice > rentFee ? rentFee : lend.totalPrice;
     IERC20(lend.payment).transfer(lend.lender, lenderEarn);
 
+    emit RentReturned(lendId, _msgSender());
+
     delete rentContracts[lendId];
   }
 
@@ -115,25 +114,14 @@ contract Market is IMarket, Context, EIP712 {
   }
 
   function _rent(uint96 lendId, Lend memory lend) private {
-    lend.adapter.lendTransfer(
+    AdapterCaller.lendTransfer(
+      lend.adapter,
       address(this),
       lend.lender,
       lend.token,
       _msgSender(),
       lend.data
     );
-    (bool succsess, ) = address(lend.adapter).delegatecall(
-      abi.encodeWithSignature(
-        "lendTransfer(address,address,address,address,bytes)",
-        address(this),
-        lend.lender,
-        lend.token,
-        _msgSender(),
-        lend.data
-      )
-    );
-
-    require(succsess, "lendTransfer failed");
 
     rentContracts[lendId] = RentContract({
       renter: _msgSender(),
@@ -286,17 +274,13 @@ contract Market is IMarket, Context, EIP712 {
     require(lend.lender == _msgSender(), "Not lender");
     require(rentContracts[lendId].renter == address(0), "Already rented");
 
-    (bool succsess, ) = address(lend.adapter).delegatecall(
-      abi.encodeWithSignature(
-        "cancelLendTransfer(address,address,address,bytes)",
-        address(this),
-        _msgSender(),
-        lend.token,
-        lend.data
-      )
+    AdapterCaller.cancelLendTransfer(
+      lend.adapter,
+      address(this),
+      _msgSender(),
+      lend.token,
+      lend.data
     );
-
-    require(succsess, "cancelLendTransfer failed");
 
     delete lends[lendId];
   }
