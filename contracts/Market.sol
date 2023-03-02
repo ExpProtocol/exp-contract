@@ -14,8 +14,8 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
   uint96 private _totalLend;
   uint96 public minimalRentTime = 86400; // 1 day
 
-  mapping(uint96 => Lend) public lends;
-  mapping(uint96 => RentContract) public rentContracts;
+  mapping(uint96 => Lend) private lends;
+  mapping(uint96 => RentContract) private rentContracts;
   mapping(address => uint24) public usedNonces;
 
   bytes32 constant PROTOCOL_OWNER_ROLE = keccak256("PROTOCOL_OWNER_ROLE");

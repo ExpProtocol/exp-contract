@@ -89,6 +89,8 @@ interface IMarket is IAccessControlEnumerable {
 
   function isBorrowable(uint96 lendId) external view returns (bool);
 
+  function usedNonces(address) external view returns (uint24);
+
   function lendCondition(
     uint96 lendId
   )
