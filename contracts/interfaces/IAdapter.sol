@@ -18,6 +18,19 @@ interface IAdapter {
     bytes calldata data
   ) external view returns (bool);
 
+  function logLend(
+    uint96 lendId,
+    address market,
+    //bytes32 lendIdAndMarket, //Optimize plan
+    address lender,
+    address token,
+    address payment,
+    uint120 pricePerSec,
+    uint120 totalPrice,
+    bool autoReRegister,
+    bytes memory data
+  ) external;
+
   function lendTransfer(
     address market,
     address lender,

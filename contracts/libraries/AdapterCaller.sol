@@ -2,8 +2,28 @@
 pragma solidity ^0.8.9;
 
 import "../interfaces/IAdapter.sol";
+import "../interfaces/IIMarket.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 library AdapterCaller {
+  function logLend(uint96 lendId, IMarket.Lend memory lend) internal {
+    (bool succsess, ) = address(lend.adapter).delegatecall(
+      abi.encodeWithSignature(
+        "logLend(uint96,address,address,address,address,uint120,uint120,bool,bytes)",
+        lendId,
+        address(this),
+        lend.lender,
+        lend.token,
+        lend.payment,
+        lend.pricePerSec,
+        lend.totalPrice,
+        lend.autoReRegister,
+        lend.data
+      )
+    );
+    require(succsess, "AdapterCaller: logLend failed");
+  }
+
   function lendTransfer(
     IAdapter adapter,
     address market,

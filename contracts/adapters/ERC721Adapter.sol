@@ -5,6 +5,17 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "../interfaces/IAdapter.sol";
 
 contract ERC721Adapter is IAdapter {
+  event ERC721LendRegistered(
+    uint96 indexed lendId,
+    address indexed lender,
+    address indexed token,
+    address payment,
+    uint256 tokenId,
+    uint120 pricePerSec,
+    uint120 totalPrice,
+    bool autoReRegister
+  );
+
   struct DataFormat {
     uint256 tokenId;
   }
@@ -23,6 +34,31 @@ contract ERC721Adapter is IAdapter {
     return
       IERC721(token).getApproved(tokenId) == market ||
       IERC721(token).ownerOf(tokenId) == market;
+  }
+
+  function logLend(
+    uint96 lendId,
+    address market,
+    address lender,
+    address token,
+    address payment,
+    uint120 pricePerSec,
+    uint120 totalPrice,
+    bool autoReRegister,
+    bytes memory data
+  ) external {
+    require(msg.sender == market, "Not market");
+    uint256 tokenId = abi.decode(data, (uint256));
+    emit ERC721LendRegistered(
+      lendId,
+      lender,
+      token,
+      payment,
+      tokenId,
+      pricePerSec,
+      totalPrice,
+      autoReRegister
+    );
   }
 
   function isReturnable(

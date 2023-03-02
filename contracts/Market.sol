@@ -226,6 +226,8 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
       data: data
     });
 
+    AdapterCaller.logLend(_totalLend, lends[_totalLend]);
+
     emit LendRegistered(
       _totalLend,
       _msgSender(),
@@ -267,6 +269,8 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
       autoReRegister: autoReRegister,
       data: data
     });
+
+    AdapterCaller.logLend(_totalLend, lends[_totalLend]);
 
     emit LendRegistered(
       lendId,
