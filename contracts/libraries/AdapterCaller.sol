@@ -30,15 +30,17 @@ library AdapterCaller {
     address lender,
     address token,
     address renter,
+    bool isLocked,
     bytes memory data
   ) internal {
     (bool succsess, ) = address(adapter).delegatecall(
       abi.encodeWithSignature(
-        "lendTransfer(address,address,address,address,bytes)",
+        "lendTransfer(address,address,address,address,bool,bytes)",
         market,
         lender,
         token,
         renter,
+        isLocked,
         data
       )
     );
@@ -50,14 +52,16 @@ library AdapterCaller {
     address market,
     address lender,
     address token,
+    bool isLocked,
     bytes memory data
   ) internal {
     (bool succsess, ) = address(adapter).delegatecall(
       abi.encodeWithSignature(
-        "cancelLendTransfer(address,address,address,bytes)",
+        "cancelLendTransfer(address,address,address,bool,bytes)",
         market,
         lender,
         token,
+        isLocked,
         data
       )
     );
@@ -71,16 +75,18 @@ library AdapterCaller {
     address lender,
     address token,
     address renter,
+    bool isLocked,
     bool autoReRegister,
     bytes memory data
   ) internal {
     (bool succsess, ) = address(adapter).delegatecall(
       abi.encodeWithSignature(
-        "returnTransfer(address,address,address,address,bool,bytes)",
+        "returnTransfer(address,address,address,address,bool,bool,bytes)",
         market,
         lender,
         token,
         renter,
+        isLocked,
         autoReRegister,
         data
       )

@@ -14,6 +14,7 @@ interface IMarket is IAccessControlEnumerable {
     IERC20 payment;
     uint120 pricePerSec;
     uint120 totalPrice;
+    bool isLocked;
     bool autoReRegister;
     bytes data;
   }

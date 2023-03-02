@@ -8,6 +8,7 @@ interface IAdapter {
     address market,
     address lender,
     address token,
+    bool isLocked,
     bytes calldata data
   ) external view returns (bool);
 
@@ -36,6 +37,7 @@ interface IAdapter {
     address lender,
     address token,
     address renter,
+    bool isLocked,
     bytes calldata data
   ) external;
 
@@ -43,6 +45,7 @@ interface IAdapter {
     address market,
     address lender,
     address token,
+    bool isLocked,
     bytes calldata data
   ) external;
 
@@ -51,6 +54,7 @@ interface IAdapter {
     address lender,
     address token,
     address renter,
+    bool isLocked,
     bool autoReRegister,
     bytes calldata data
   ) external;

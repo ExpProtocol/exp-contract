@@ -28,12 +28,15 @@ contract ERC721Adapter is IAdapter {
     address market,
     address,
     address token,
+    bool isLocked,
     bytes calldata data
   ) external view returns (bool) {
     uint256 tokenId = abi.decode(data, (uint256));
-    return
-      IERC721(token).getApproved(tokenId) == market ||
-      IERC721(token).ownerOf(tokenId) == market;
+    if (isLocked) {
+      return IERC721(token).ownerOf(tokenId) == market;
+    } else {
+      return IERC721(token).getApproved(tokenId) == market;
+    }
   }
 
   function logLend(
@@ -76,13 +79,14 @@ contract ERC721Adapter is IAdapter {
     address lender,
     address token,
     address renter,
+    bool isLocked,
     bytes calldata data
   ) external {
     uint256 tokenId = abi.decode(data, (uint256));
-    if (IERC721(token).ownerOf(tokenId) == lender) {
-      IERC721(token).safeTransferFrom(lender, renter, tokenId);
-    } else {
+    if (isLocked) {
       IERC721(token).safeTransferFrom(market, renter, tokenId);
+    } else {
+      IERC721(token).safeTransferFrom(lender, renter, tokenId);
     }
   }
 
@@ -90,10 +94,11 @@ contract ERC721Adapter is IAdapter {
     address market,
     address lender,
     address token,
+    bool isLocked,
     bytes calldata data
   ) external {
     uint256 tokenId = abi.decode(data, (uint256));
-    if (IERC721(token).ownerOf(tokenId) == market) {
+    if (isLocked) {
       IERC721(token).safeTransferFrom(market, lender, tokenId);
     }
   }
@@ -103,6 +108,7 @@ contract ERC721Adapter is IAdapter {
     address lender,
     address token,
     address renter,
+    bool,
     bool autoReRegister,
     bytes calldata data
   ) external {

@@ -48,6 +48,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
         address(this),
         _msgSender(),
         lend.token,
+        lend.isLocked,
         lend.data
       );
   }
@@ -65,7 +66,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
   }
 
   function returnToken(uint96 lendId) public {
-    Lend memory lend = lends[lendId];
+    Lend storage lend = lends[lendId];
     RentContract memory rentContract = rentContracts[lendId];
     uint96 rentTime = _blockTimeStamp() - rentContract.startTime;
     uint120 rentFee = rentTime * lend.pricePerSec;
@@ -82,6 +83,8 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
       lend.autoReRegister,
       lend.data
     );
+
+    lend.isLocked = lend.autoReRegister; //Check Lock Flag;
 
     uint120 totalReturn = lend.totalPrice - rentFee;
     uint120 shoudReturnForGuarant = rentContract.guarantBalance +
@@ -132,6 +135,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
       lend.lender,
       lend.token,
       _msgSender(),
+      lend.isLocked,
       lend.data
     );
 
@@ -212,7 +216,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
   ) external {
     require(adapter.isValidData(data), "Invalid data");
     require(
-      adapter.isBorrowable(address(this), _msgSender(), token, data),
+      adapter.isBorrowable(address(this), _msgSender(), token, false, data),
       "Not borrowable"
     );
     lends[_totalLend] = Lend({
@@ -222,6 +226,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
       payment: IERC20(payment),
       pricePerSec: pricePerSec,
       totalPrice: totalPrice,
+      isLocked: false,
       autoReRegister: autoReRegister,
       data: data
     });
@@ -255,10 +260,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     require(lend.lender == _msgSender(), "Not lender");
     require(rentContracts[lendId].renter == address(0), "Already rented");
     require(lend.adapter.isValidData(data), "Invalid data");
-    require(
-      lend.adapter.isBorrowable(address(this), _msgSender(), lend.token, data),
-      "Not borrowable"
-    );
+
     lends[lendId] = Lend({
       lender: _msgSender(),
       adapter: lend.adapter,
@@ -266,6 +268,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
       payment: IERC20(payment),
       pricePerSec: pricePerSec,
       totalPrice: totalPrice,
+      isLocked: lend.isLocked,
       autoReRegister: autoReRegister,
       data: data
     });
