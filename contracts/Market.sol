@@ -80,6 +80,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
       lend.lender,
       lend.token,
       _msgSender(),
+      lend.isLocked,
       lend.autoReRegister,
       lend.data
     );
@@ -298,6 +299,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
       address(this),
       _msgSender(),
       lend.token,
+      lend.isLocked,
       lend.data
     );
 
