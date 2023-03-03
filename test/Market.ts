@@ -142,6 +142,7 @@ describe("Market", function () {
         {
           GuarantorRequest: [
             { type: "uint96", name: "lendId" },
+            { type: "address", name: "renter" },
             { type: "uint120", name: "guarantorBalance" },
             { type: "uint16", name: "guarantorFee" },
             { type: "uint24", name: "nonce" },
@@ -149,6 +150,7 @@ describe("Market", function () {
         },
         {
           lendId: 0,
+          renter: otherAccount.address,
           guarantorBalance: 50000,
           guarantorFee: 20, //5%
           nonce: 1,
@@ -157,7 +159,15 @@ describe("Market", function () {
 
       await erc20.connect(otherAccount).approve(market.address, 50000);
       await erc20.connect(guarantor).approve(market.address, 50000);
-      await expect(await market.connect(otherAccount).rentWithGuarantor(0, guarantor.address, 50000, 20, signature));
+      await expect(market.connect(otherAccount).rentWithGuarantor(0, guarantor.address, 50000, 20, signature))
+        .to.emit(market, "RentStarted")
+        .withArgs(0, otherAccount.address, guarantor.address, 50000, 20)
+        .to.emit(erc721, "Transfer")
+        .withArgs(owner.address, otherAccount.address, 1)
+        .to.emit(erc20, "Transfer")
+        .withArgs(otherAccount.address, market.address, 50000)
+        .to.emit(erc20, "Transfer")
+        .withArgs(guarantor.address, market.address, 50000);
     });
 
     it("should be able to return a 1155 token", async () => {
@@ -213,6 +223,67 @@ describe("Market", function () {
 
       expect(await erc20.balanceOf(otherAccount.address)).to.within(0, 13600);
       expect(await erc20.balanceOf(owner.address)).to.within(82080, 100000);
+      expect(await erc20.balanceOf(market.address)).to.within(4320, 13600);
+    });
+
+    it("should be able to return a 1155 token with a guarantor", async () => {
+      const { owner, otherAccount, guarantor, market, erc20, erc721 } = await loadFixture(deployFull);
+      await erc721.mint(owner.address, 1);
+      await erc721.approve(market.address, 1);
+      await market.connect(owner).lend721(erc721.address, 1, erc20.address, 1, 200000, false);
+
+      await erc20.mint(otherAccount.address, 150000);
+      await erc20.connect(otherAccount).approve(market.address, 150000);
+      await erc20.mint(guarantor.address, 50000);
+      await erc20.connect(guarantor).approve(market.address, 50000);
+
+      const signature = guarantor._signTypedData(
+        {
+          chainId: await ethers.provider.getNetwork().then((n) => n.chainId),
+          verifyingContract: market.address,
+          name: "EXP-Market",
+          version: "1",
+        },
+        {
+          GuarantorRequest: [
+            { type: "uint96", name: "lendId" },
+            { type: "address", name: "renter" },
+            { type: "uint120", name: "guarantorBalance" },
+            { type: "uint16", name: "guarantorFee" },
+            { type: "uint24", name: "nonce" },
+          ],
+        },
+        {
+          lendId: 0,
+          renter: otherAccount.address,
+          guarantorBalance: 50000,
+          guarantorFee: 20, //5%
+          nonce: 1,
+        }
+      );
+
+      await erc20.connect(otherAccount).approve(market.address, 150000);
+      await erc20.connect(guarantor).approve(market.address, 50000);
+      await market.connect(otherAccount).rentWithGuarantor(0, guarantor.address, 50000, 20, signature);
+
+      await time.increase(86400);
+
+      await erc721.connect(otherAccount).approve(market.address, 1);
+      await expect(market.connect(otherAccount).returnToken(0))
+        .to.emit(market, "RentReturned")
+        .withArgs(0, otherAccount.address)
+        .to.emit(erc721, "Transfer")
+        .withArgs(otherAccount.address, owner.address, 1)
+        .to.emit(erc20, "Transfer")
+        .withArgs(market.address, owner.address, anyUint)
+        .to.emit(erc20, "Transfer")
+        .withArgs(market.address, otherAccount.address, anyUint)
+        .to.emit(erc20, "Transfer")
+        .withArgs(market.address, guarantor.address, anyUint);
+
+      expect(await erc20.balanceOf(otherAccount.address)).to.within(0, 63350);
+      expect(await erc20.balanceOf(owner.address)).to.within(82080, 100000);
+      expect(await erc20.balanceOf(guarantor.address)).to.equal(52500);
       expect(await erc20.balanceOf(market.address)).to.within(4320, 13600);
     });
   });

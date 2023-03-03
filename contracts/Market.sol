@@ -31,6 +31,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
       abi.encodePacked(
         "GuarantorRequest(",
         "uint96 lendId,",
+        "address renter,",
         "uint120 guarantorBalance,",
         "uint16 guarantorFee,",
         "uint24 nonce"
@@ -124,7 +125,13 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     delete lends[lendId];
   }
 
-  function _rent(uint96 lendId, Lend memory lend) private {
+  function _rent(
+    uint96 lendId,
+    Lend memory lend,
+    address guarantor,
+    uint120 guarantorBalance,
+    uint16 guarantorFee
+  ) private {
     AdapterCaller.lendTransfer(
       lend.adapter,
       address(this),
@@ -138,9 +145,9 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     rentContracts[lendId] = RentContract({
       renter: _msgSender(),
       startTime: _blockTimeStamp(),
-      guarantor: address(0),
-      guarantorBalance: 0,
-      guarantorFee: 0
+      guarantor: guarantor,
+      guarantorBalance: guarantorBalance,
+      guarantorFee: guarantorFee
     });
   }
 
@@ -151,7 +158,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     require(_isBorrowabe(lend), "Not borrowable");
     lend.payment.transferFrom(_msgSender(), address(this), lend.totalPrice);
 
-    _rent(lendId, lend);
+    _rent(lendId, lend, address(0), 0, 0);
 
     emit RentStarted(lendId, _msgSender(), address(0), 0, 0);
   }
@@ -170,7 +177,14 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
 
     bytes32 guarantorDigest = _hashTypedDataV4(
       keccak256(
-        abi.encode(GUARANTOR_REQUEST_TYPE_HASH, lendId, guarantorBalance, guarantorFee, usedNonces[guarantor] + 1)
+        abi.encode(
+          GUARANTOR_REQUEST_TYPE_HASH,
+          lendId,
+          _msgSender(),
+          guarantorBalance,
+          guarantorFee,
+          usedNonces[guarantor] + 1
+        )
       )
     );
 
@@ -182,7 +196,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
 
     emit RentStarted(lendId, _msgSender(), guarantor, guarantorBalance, guarantorFee);
 
-    _rent(lendId, lend);
+    _rent(lendId, lend, guarantor, guarantorBalance, guarantorFee);
     usedNonces[guarantor]++;
   }
 
