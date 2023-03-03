@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract FeeManager is AccessControlEnumerable {
+  event FeeClaimed(address indexed payment, uint256 amount);
   event ProtocolFeeUpdated(uint16 oldrotocolFee, uint16 newProtocolFee);
 
   mapping(IERC20 => uint256) public collectedFees;
@@ -16,10 +17,14 @@ contract FeeManager is AccessControlEnumerable {
     IERC20 payment = IERC20(payment_);
     uint256 targets = getRoleMemberCount(TREASURY_ROLE);
     uint256 valuePerTarget = collectedFees[payment] / targets;
+
     for (uint256 i = 0; i < targets; i++) {
       address target = getRoleMember(TREASURY_ROLE, i);
       payment.transfer(target, valuePerTarget);
     }
+    emit FeeClaimed(payment_, collectedFees[payment]);
+
+    collectedFees[payment] = 0;
   }
 
   function protocolFee() external view returns (uint256) {

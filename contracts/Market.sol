@@ -52,7 +52,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     return uint96(block.timestamp);
   }
 
-  function _isBorrowabe(Lend memory lend) private view returns (bool) {
+  function _isBorrowabel(Lend memory lend) private view returns (bool) {
     return lend.adapter.isBorrowable(address(this), lend.lender, lend.token, lend.isLocked, lend.data);
   }
 
@@ -155,7 +155,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     Lend memory lend = lends[lendId];
     require(lend.lender != address(0), "Lend not found");
     require(rentContracts[lendId].renter == address(0), "Already rented");
-    require(_isBorrowabe(lend), "Not borrowable");
+    require(_isBorrowabel(lend), "Not borrowable");
     lend.payment.transferFrom(_msgSender(), address(this), lend.totalPrice);
 
     _rent(lendId, lend, address(0), 0, 0);
@@ -173,7 +173,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     Lend memory lend = lends[lendId];
     require(lend.lender != address(0), "Lend not found");
     require(rentContracts[lendId].renter == address(0), "Already rented");
-    require(_isBorrowabe(lend), "Not borrowable");
+    require(_isBorrowabel(lend), "Not borrowable");
 
     bytes32 guarantorDigest = _hashTypedDataV4(
       keccak256(
@@ -333,7 +333,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
 
   function isBorrowable(uint96 lendId) external view returns (bool) {
     Lend memory lend = lends[lendId];
-    return _isBorrowabe(lend);
+    return _isBorrowabel(lend);
   }
 
   function lendCount() external view returns (uint256) {
