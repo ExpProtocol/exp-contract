@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
-import "./interfaces/IIMarket.sol";
+import "./interfaces/IMarket.sol";
 import "./interfaces/IAdapter.sol";
 import "./libraries/AdapterCaller.sol";
 import "./libraries/FeeManager.sol";
@@ -70,6 +70,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     RentContract memory rentContract = rentContracts[lendId];
     uint96 rentTime = _blockTimeStamp() - rentContract.startTime;
     uint120 rentFee = rentTime * lend.pricePerSec;
+    require(rentTime > minimalRentTime, "Not enough rent time");
     require(rentContract.renter == _msgSender(), "Not renter");
     require(lend.totalPrice > rentFee, "Already overtime");
     require(_isReturnable(lendId), "Not returnable");
