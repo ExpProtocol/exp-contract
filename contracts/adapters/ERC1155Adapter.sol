@@ -3,6 +3,7 @@ pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "../interfaces/IAdapter.sol";
+import "hardhat/console.sol";
 
 contract ERC1155Adapter is IAdapter {
   event ERC1155LendRegistered(
@@ -36,6 +37,7 @@ contract ERC1155Adapter is IAdapter {
     bytes calldata data
   ) external view returns (bool) {
     DataFormat memory tokenData = abi.decode(data, (DataFormat));
+
     if (isLocked) {
       return
         IERC1155(token).balanceOf(market, tokenData.tokenId) >=
@@ -74,6 +76,7 @@ contract ERC1155Adapter is IAdapter {
   ) external {
     require(msg.sender == market, "Not market");
     DataFormat memory tokenData = abi.decode(data, (DataFormat));
+
     emit ERC1155LendRegistered(
       lendId,
       lender,

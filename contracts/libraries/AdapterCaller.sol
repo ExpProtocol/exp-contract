@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../interfaces/IAdapter.sol";
 import "../interfaces/IMarket.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "hardhat/console.sol";
 
 library AdapterCaller {
   function logLend(uint96 lendId, IMarket.Lend memory lend) internal {
-    (bool succsess, ) = address(lend.adapter).delegatecall(
+    (bool succsess, ) = address(lend.adapter).call(
       abi.encodeWithSelector(
         IAdapter.logLend.selector,
         lendId,

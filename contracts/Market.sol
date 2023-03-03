@@ -9,8 +9,13 @@ import "./interfaces/IMarket.sol";
 import "./interfaces/IAdapter.sol";
 import "./libraries/AdapterCaller.sol";
 import "./libraries/FeeManager.sol";
+import "./adapters/ERC721Adapter.sol";
+import "./adapters/ERC1155Adapter.sol";
 
 contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
+  ERC721Adapter public erc721Adaper;
+  ERC1155Adapter public erc1155Adaper;
+
   uint96 private _totalLend;
   uint96 public minimalRentTime = 86400; // 1 day
 
@@ -32,10 +37,16 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
       )
     );
 
-  constructor() EIP712("EXP-Market", "1") {
+  constructor(
+    address erc721Adaper_,
+    address erc1155Adaper_
+  ) EIP712("EXP-Market", "1") {
     _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
     _setupRole(PROTOCOL_OWNER_ROLE, _msgSender());
     _setupRole(TREASURY_ROLE, _msgSender());
+
+    erc721Adaper = ERC721Adapter(erc721Adaper_);
+    erc1155Adaper = ERC1155Adapter(erc1155Adaper_);
   }
 
   function _blockTimeStamp() private view returns (uint96) {
@@ -46,7 +57,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     return
       lend.adapter.isBorrowable(
         address(this),
-        _msgSender(),
+        lend.lender,
         lend.token,
         lend.isLocked,
         lend.data
@@ -214,8 +225,8 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     uint120 pricePerSec,
     uint120 totalPrice,
     bool autoReRegister,
-    bytes calldata data
-  ) external {
+    bytes memory data
+  ) public {
     require(adapter.isValidData(data), "Invalid data");
     require(
       adapter.isBorrowable(address(this), _msgSender(), token, false, data),
@@ -248,6 +259,45 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     );
 
     _totalLend++;
+  }
+
+  function lend721(
+    address token,
+    uint256 tokenId,
+    address payment,
+    uint120 pricePerSec,
+    uint120 totalPrice,
+    bool autoReRegister
+  ) external {
+    registerToLend(
+      erc721Adaper,
+      token,
+      payment,
+      pricePerSec,
+      totalPrice,
+      autoReRegister,
+      abi.encode(ERC721Adapter.DataFormat(tokenId))
+    );
+  }
+
+  function lend1155(
+    address token,
+    uint256 tokenId,
+    uint256 amount,
+    address payment,
+    uint120 pricePerSec,
+    uint120 totalPrice,
+    bool autoReRegister
+  ) external {
+    registerToLend(
+      erc1155Adaper,
+      token,
+      payment,
+      pricePerSec,
+      totalPrice,
+      autoReRegister,
+      abi.encode(ERC1155Adapter.DataFormat(tokenId, amount))
+    );
   }
 
   function renewalLend(
