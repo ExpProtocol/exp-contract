@@ -180,12 +180,10 @@ describe("Market", function () {
       await erc20.connect(otherAccount).approve(market.address, 100000);
       await market.connect(otherAccount).rent(0);
 
-      await time.increase(86400);
-
       await erc1155.connect(otherAccount).setApprovalForAll(market.address, true);
       await expect(market.connect(otherAccount).returnToken(0))
         .to.emit(market, "RentReturned")
-        .withArgs(0, otherAccount.address)
+        .withArgs(0, otherAccount.address, false)
         .to.emit(erc1155, "TransferSingle")
         .withArgs(market.address, otherAccount.address, owner.address, 1, 1)
         .to.emit(erc20, "Transfer")
@@ -193,9 +191,9 @@ describe("Market", function () {
         .to.emit(erc20, "Transfer")
         .withArgs(market.address, otherAccount.address, anyUint);
 
-      expect(await erc20.balanceOf(otherAccount.address)).to.within(0, 13600);
-      expect(await erc20.balanceOf(owner.address)).to.within(82080, 100000);
-      expect(await erc20.balanceOf(market.address)).to.within(4320, 13600);
+      expect(await erc20.balanceOf(otherAccount.address)).to.equal(13600);
+      expect(await erc20.balanceOf(owner.address)).to.equal(82080);
+      expect(await erc20.balanceOf(market.address)).to.equal(4320);
     });
 
     it("should be able to return a 721 token", async () => {
@@ -208,12 +206,10 @@ describe("Market", function () {
       await erc20.connect(otherAccount).approve(market.address, 100000);
       await market.connect(otherAccount).rent(0);
 
-      await time.increase(86400);
-
       await erc721.connect(otherAccount).approve(market.address, 1);
       await expect(market.connect(otherAccount).returnToken(0))
         .to.emit(market, "RentReturned")
-        .withArgs(0, otherAccount.address)
+        .withArgs(0, otherAccount.address, false)
         .to.emit(erc721, "Transfer")
         .withArgs(otherAccount.address, owner.address, 1)
         .to.emit(erc20, "Transfer")
@@ -221,9 +217,9 @@ describe("Market", function () {
         .to.emit(erc20, "Transfer")
         .withArgs(market.address, otherAccount.address, anyUint);
 
-      expect(await erc20.balanceOf(otherAccount.address)).to.within(0, 13600);
-      expect(await erc20.balanceOf(owner.address)).to.within(82080, 100000);
-      expect(await erc20.balanceOf(market.address)).to.within(4320, 13600);
+      expect(await erc20.balanceOf(otherAccount.address)).to.equal(13600);
+      expect(await erc20.balanceOf(owner.address)).to.equal(82080);
+      expect(await erc20.balanceOf(market.address)).to.equal(4320);
     });
 
     it("should be able to return a 1155 token with a guarantor", async () => {
@@ -266,12 +262,10 @@ describe("Market", function () {
       await erc20.connect(guarantor).approve(market.address, 50000);
       await market.connect(otherAccount).rentWithGuarantor(0, guarantor.address, 50000, 20, signature);
 
-      await time.increase(86400);
-
       await erc721.connect(otherAccount).approve(market.address, 1);
       await expect(market.connect(otherAccount).returnToken(0))
         .to.emit(market, "RentReturned")
-        .withArgs(0, otherAccount.address)
+        .withArgs(0, otherAccount.address, false)
         .to.emit(erc721, "Transfer")
         .withArgs(otherAccount.address, owner.address, 1)
         .to.emit(erc20, "Transfer")
@@ -281,10 +275,10 @@ describe("Market", function () {
         .to.emit(erc20, "Transfer")
         .withArgs(market.address, guarantor.address, anyUint);
 
-      expect(await erc20.balanceOf(otherAccount.address)).to.within(0, 63350);
-      expect(await erc20.balanceOf(owner.address)).to.within(82080, 100000);
+      expect(await erc20.balanceOf(otherAccount.address)).to.equal(61100);
+      expect(await erc20.balanceOf(owner.address)).to.equal(82080);
       expect(await erc20.balanceOf(guarantor.address)).to.equal(52500);
-      expect(await erc20.balanceOf(market.address)).to.within(4320, 13600);
+      expect(await erc20.balanceOf(market.address)).to.equal(4320);
     });
   });
 });

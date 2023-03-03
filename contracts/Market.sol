@@ -18,7 +18,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
   ERC1155Adapter public erc1155Adapter;
 
   uint96 private _totalLend;
-  uint96 public minimalRentTime = 86400; // 1 day
+  uint96 public minimalRentTime = 1 days; // 1 day
 
   mapping(uint96 => Lend) private lends;
   mapping(uint96 => RentContract) private rentContracts;
@@ -67,9 +67,9 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
   function returnToken(uint96 lendId) public {
     Lend storage lend = lends[lendId];
     RentContract memory rentContract = rentContracts[lendId];
-    uint96 rentTime = _blockTimeStamp() - rentContract.startTime;
+    uint120 rentSec = _blockTimeStamp() - rentContract.startTime;
+    uint120 rentTime = ((rentSec / minimalRentTime) + 1) * minimalRentTime;
     uint120 rentFee = rentTime * lend.pricePerSec;
-    require(rentTime > minimalRentTime, "Not enough rent time");
     require(lend.totalPrice > rentFee, "Already overtime");
     require(_isReturnable(lendId), "Not returnable");
 
@@ -104,7 +104,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     uint256 fee = _collectFee(lend.payment, rentFee);
     IERC20(lend.payment).transfer(lend.lender, rentFee - fee);
 
-    emit RentReturned(lendId, _msgSender());
+    emit RentReturned(lendId, _msgSender(), lend.autoReRegister);
 
     delete rentContracts[lendId];
   }

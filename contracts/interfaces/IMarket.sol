@@ -46,7 +46,7 @@ interface IMarket is IAccessControlEnumerable {
     uint16 guarantorFee
   );
 
-  event RentReturned(uint96 indexed lendId, address indexed renter);
+  event RentReturned(uint96 indexed lendId, address indexed renter, bool autoReRegister);
 
   event MinimumRentTimeUpdated(uint96 oldMinimumRentTime, uint96 newMinimumRentTime);
 
