@@ -23,9 +23,7 @@ contract ERC1155Adapter is IAdapter {
     uint256 amount;
   }
 
-  function isValidData(
-    bytes calldata data
-  ) external pure override returns (bool) {
+  function isValidData(bytes calldata data) external pure override returns (bool) {
     return data.length == 64;
   }
 
@@ -39,14 +37,11 @@ contract ERC1155Adapter is IAdapter {
     DataFormat memory tokenData = abi.decode(data, (DataFormat));
 
     if (isLocked) {
-      return
-        IERC1155(token).balanceOf(market, tokenData.tokenId) >=
-        tokenData.amount;
+      return IERC1155(token).balanceOf(market, tokenData.tokenId) >= tokenData.amount;
     } else {
       return
         IERC1155(token).isApprovedForAll(lender, market) &&
-        IERC1155(token).balanceOf(lender, tokenData.tokenId) >=
-        tokenData.amount;
+        IERC1155(token).balanceOf(lender, tokenData.tokenId) >= tokenData.amount;
     }
   }
 
@@ -100,21 +95,9 @@ contract ERC1155Adapter is IAdapter {
   ) external {
     DataFormat memory tokenData = abi.decode(data, (DataFormat));
     if (isLocked) {
-      IERC1155(token).safeTransferFrom(
-        market,
-        renter,
-        tokenData.tokenId,
-        tokenData.amount,
-        ""
-      );
+      IERC1155(token).safeTransferFrom(market, renter, tokenData.tokenId, tokenData.amount, "");
     } else {
-      IERC1155(token).safeTransferFrom(
-        lender,
-        renter,
-        tokenData.tokenId,
-        tokenData.amount,
-        ""
-      );
+      IERC1155(token).safeTransferFrom(lender, renter, tokenData.tokenId, tokenData.amount, "");
     }
   }
 
@@ -127,13 +110,7 @@ contract ERC1155Adapter is IAdapter {
   ) external {
     DataFormat memory tokenData = abi.decode(data, (DataFormat));
     if (isLocked) {
-      IERC1155(token).safeTransferFrom(
-        market,
-        lender,
-        tokenData.tokenId,
-        tokenData.amount,
-        ""
-      );
+      IERC1155(token).safeTransferFrom(market, lender, tokenData.tokenId, tokenData.amount, "");
     }
   }
 
@@ -148,21 +125,9 @@ contract ERC1155Adapter is IAdapter {
   ) external {
     DataFormat memory tokenData = abi.decode(data, (DataFormat));
     if (autoReRegister) {
-      IERC1155(token).safeTransferFrom(
-        renter,
-        market,
-        tokenData.tokenId,
-        tokenData.amount,
-        ""
-      );
+      IERC1155(token).safeTransferFrom(renter, market, tokenData.tokenId, tokenData.amount, "");
     } else {
-      IERC1155(token).safeTransferFrom(
-        renter,
-        lender,
-        tokenData.tokenId,
-        tokenData.amount,
-        ""
-      );
+      IERC1155(token).safeTransferFrom(renter, lender, tokenData.tokenId, tokenData.amount, "");
     }
   }
 }

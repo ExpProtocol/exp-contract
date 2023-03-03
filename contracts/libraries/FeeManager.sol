@@ -9,7 +9,7 @@ contract FeeManager is AccessControlEnumerable {
 
   mapping(IERC20 => uint256) public collectedFees;
 
-  uint16 public _protocolFee = 20; // (1/x)% 5% = 20
+  uint16 private _protocolFee = 20; // (1/x)% 5% = 20
   bytes32 constant TREASURY_ROLE = keccak256("PROTOCOL_OWNER_ROLE");
 
   function claimFee(address payment_) public {
@@ -22,11 +22,12 @@ contract FeeManager is AccessControlEnumerable {
     }
   }
 
-  function _collectFee(
-    IERC20 payment,
-    uint256 amount
-  ) internal returns (uint256 fee) {
-    fee = amount + (amount * _protocolFee);
+  function protocolFee() external view returns (uint256) {
+    return _protocolFee;
+  }
+
+  function _collectFee(IERC20 payment, uint256 amount) internal returns (uint256 fee) {
+    fee = amount / _protocolFee;
     collectedFees[payment] += fee;
   }
 

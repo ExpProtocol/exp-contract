@@ -22,8 +22,8 @@ interface IMarket is IAccessControlEnumerable {
     address renter;
     uint96 startTime;
     address guarantor;
-    uint120 guarantBalance;
-    uint16 guarantFee; // (1/x)%
+    uint120 guarantorBalance;
+    uint16 guarantorFee; // (1/x)%
   }
 
   event LendRegistered(
@@ -42,16 +42,13 @@ interface IMarket is IAccessControlEnumerable {
     uint96 indexed lendId,
     address indexed renter,
     address indexed guarantor,
-    uint120 guarantBalance,
-    uint16 guarantFee
+    uint120 guarantorBalance,
+    uint16 guarantorFee
   );
 
   event RentReturned(uint96 indexed lendId, address indexed renter);
 
-  event MinimumRentTimeUpdated(
-    uint96 oldMinimumRentTime,
-    uint96 newMinimumRentTime
-  );
+  event MinimumRentTimeUpdated(uint96 oldMinimumRentTime, uint96 newMinimumRentTime);
 
   event LendCanceled(uint96 indexed lendId, address indexed lender);
 
@@ -60,8 +57,8 @@ interface IMarket is IAccessControlEnumerable {
   function rentWithGuarantor(
     uint96 lendId,
     address guarantor,
-    uint120 guarantBalance,
-    uint16 guarantFee,
+    uint120 guarantorBalance,
+    uint16 guarantorFee,
     bytes calldata signature
   ) external;
 
@@ -94,6 +91,8 @@ interface IMarket is IAccessControlEnumerable {
 
   function usedNonces(address) external view returns (uint24);
 
+  function lendCount() external view returns (uint256);
+
   function lendCondition(
     uint96 lendId
   )
@@ -115,11 +114,5 @@ interface IMarket is IAccessControlEnumerable {
   )
     external
     view
-    returns (
-      address payment,
-      uint120 pricePerSec,
-      uint120 totalPrice,
-      bool autoReRegister,
-      bytes memory data
-    );
+    returns (address payment, uint120 pricePerSec, uint120 totalPrice, bool autoReRegister, bytes memory data);
 }

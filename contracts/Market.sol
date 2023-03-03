@@ -11,10 +11,11 @@ import "./libraries/AdapterCaller.sol";
 import "./libraries/FeeManager.sol";
 import "./adapters/ERC721Adapter.sol";
 import "./adapters/ERC1155Adapter.sol";
+import "hardhat/console.sol";
 
 contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
-  ERC721Adapter public erc721Adaper;
-  ERC1155Adapter public erc1155Adaper;
+  ERC721Adapter public erc721Adapter;
+  ERC1155Adapter public erc1155Adapter;
 
   uint96 private _totalLend;
   uint96 public minimalRentTime = 86400; // 1 day
@@ -25,28 +26,25 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
 
   bytes32 constant PROTOCOL_OWNER_ROLE = keccak256("PROTOCOL_OWNER_ROLE");
 
-  bytes32 constant GUARANT_REQUEST_TYPE_HASH =
+  bytes32 constant GUARANTOR_REQUEST_TYPE_HASH =
     keccak256(
       abi.encodePacked(
-        "GuarantRequest(",
+        "GuarantorRequest(",
         "uint96 lendId,",
-        "uint120 guarantBalance,",
-        "uint16 guarantFee,",
+        "uint120 guarantorBalance,",
+        "uint16 guarantorFee,",
         "uint24 nonce"
         ")"
       )
     );
 
-  constructor(
-    address erc721Adaper_,
-    address erc1155Adaper_
-  ) EIP712("EXP-Market", "1") {
+  constructor(address erc721Adapter_, address erc1155Adapter_) EIP712("EXP-Market", "1") {
     _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
     _setupRole(PROTOCOL_OWNER_ROLE, _msgSender());
     _setupRole(TREASURY_ROLE, _msgSender());
 
-    erc721Adaper = ERC721Adapter(erc721Adaper_);
-    erc1155Adaper = ERC1155Adapter(erc1155Adaper_);
+    erc721Adapter = ERC721Adapter(erc721Adapter_);
+    erc1155Adapter = ERC1155Adapter(erc1155Adapter_);
   }
 
   function _blockTimeStamp() private view returns (uint96) {
@@ -54,26 +52,15 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
   }
 
   function _isBorrowabe(Lend memory lend) private view returns (bool) {
-    return
-      lend.adapter.isBorrowable(
-        address(this),
-        lend.lender,
-        lend.token,
-        lend.isLocked,
-        lend.data
-      );
+    return lend.adapter.isBorrowable(address(this), lend.lender, lend.token, lend.isLocked, lend.data);
   }
 
   function _isReturnable(uint96 lendId) private view returns (bool) {
     Lend memory lend = lends[lendId];
     RentContract memory rentContract = rentContracts[lendId];
     return
-      lend.adapter.isReturnable(
-        address(this),
-        _msgSender(),
-        lend.token,
-        lend.data
-      ) && rentContract.renter == _msgSender();
+      lend.adapter.isReturnable(address(this), _msgSender(), lend.token, lend.data) &&
+      rentContract.renter == _msgSender();
   }
 
   function returnToken(uint96 lendId) public {
@@ -82,7 +69,6 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     uint96 rentTime = _blockTimeStamp() - rentContract.startTime;
     uint120 rentFee = rentTime * lend.pricePerSec;
     require(rentTime > minimalRentTime, "Not enough rent time");
-    require(rentContract.renter == _msgSender(), "Not renter");
     require(lend.totalPrice > rentFee, "Already overtime");
     require(_isReturnable(lendId), "Not returnable");
 
@@ -100,25 +86,22 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     lend.isLocked = lend.autoReRegister; //Check Lock Flag;
 
     uint120 totalReturn = lend.totalPrice - rentFee;
-    uint120 shoudReturnForGuarant = rentContract.guarantBalance +
-      rentContract.guarantBalance /
-      rentContract.guarantFee;
-    if (shoudReturnForGuarant > totalReturn) {
-      IERC20(lend.payment).transfer(rentContract.guarantor, totalReturn);
+    if (rentContract.guarantor == address(0)) {
+      IERC20(lend.payment).transfer(rentContract.renter, totalReturn);
     } else {
-      IERC20(lend.payment).transfer(
-        rentContract.guarantor,
-        shoudReturnForGuarant
-      );
-      IERC20(lend.payment).transfer(
-        rentContract.renter,
-        totalReturn - shoudReturnForGuarant
-      );
+      uint120 shoudReturnForGuarant = rentContract.guarantorBalance +
+        rentContract.guarantorBalance /
+        rentContract.guarantorFee;
+      if (shoudReturnForGuarant > totalReturn) {
+        IERC20(lend.payment).transfer(rentContract.guarantor, totalReturn);
+      } else {
+        IERC20(lend.payment).transfer(rentContract.guarantor, shoudReturnForGuarant);
+        IERC20(lend.payment).transfer(rentContract.renter, totalReturn - shoudReturnForGuarant);
+      }
     }
 
-    uint256 lenderEarn = lend.totalPrice > rentFee ? rentFee : lend.totalPrice;
-    uint256 fee = _collectFee(lend.payment, lenderEarn);
-    IERC20(lend.payment).transfer(lend.lender, lenderEarn - fee);
+    uint256 fee = _collectFee(lend.payment, rentFee);
+    IERC20(lend.payment).transfer(lend.lender, rentFee - fee);
 
     emit RentReturned(lendId, _msgSender());
 
@@ -156,8 +139,8 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
       renter: _msgSender(),
       startTime: _blockTimeStamp(),
       guarantor: address(0),
-      guarantBalance: 0,
-      guarantFee: 0
+      guarantorBalance: 0,
+      guarantorFee: 0
     });
   }
 
@@ -166,7 +149,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     require(lend.lender != address(0), "Lend not found");
     require(rentContracts[lendId].renter == address(0), "Already rented");
     require(_isBorrowabe(lend), "Not borrowable");
-    lend.payment.transferFrom(_msgSender(), lend.lender, lend.totalPrice);
+    lend.payment.transferFrom(_msgSender(), address(this), lend.totalPrice);
 
     _rent(lendId, lend);
 
@@ -176,8 +159,8 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
   function rentWithGuarantor(
     uint96 lendId,
     address guarantor,
-    uint120 guarantBalance,
-    uint16 guarantFee,
+    uint120 guarantorBalance,
+    uint16 guarantorFee,
     bytes calldata signature
   ) external {
     Lend memory lend = lends[lendId];
@@ -185,34 +168,19 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     require(rentContracts[lendId].renter == address(0), "Already rented");
     require(_isBorrowabe(lend), "Not borrowable");
 
-    bytes32 guarantDigest = _hashTypedDataV4(
+    bytes32 guarantorDigest = _hashTypedDataV4(
       keccak256(
-        abi.encode(
-          GUARANT_REQUEST_TYPE_HASH,
-          lendId,
-          guarantBalance,
-          guarantFee,
-          usedNonces[guarantor] + 1
-        )
+        abi.encode(GUARANTOR_REQUEST_TYPE_HASH, lendId, guarantorBalance, guarantorFee, usedNonces[guarantor] + 1)
       )
     );
 
-    require(
-      ECDSA.recover(guarantDigest, signature) == guarantor,
-      "Invalid signature"
-    );
+    require(ECDSA.recover(guarantorDigest, signature) == guarantor, "Invalid signature");
 
-    uint120 rentPrice = lend.totalPrice - guarantBalance;
-    lend.payment.transferFrom(_msgSender(), lend.lender, rentPrice);
-    lend.payment.transferFrom(guarantor, lend.lender, guarantBalance);
+    uint120 rentPrice = lend.totalPrice - guarantorBalance;
+    lend.payment.transferFrom(_msgSender(), address(this), rentPrice);
+    lend.payment.transferFrom(guarantor, address(this), guarantorBalance);
 
-    emit RentStarted(
-      lendId,
-      _msgSender(),
-      guarantor,
-      guarantBalance,
-      guarantFee
-    );
+    emit RentStarted(lendId, _msgSender(), guarantor, guarantorBalance, guarantorFee);
 
     _rent(lendId, lend);
     usedNonces[guarantor]++;
@@ -228,10 +196,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     bytes memory data
   ) public {
     require(adapter.isValidData(data), "Invalid data");
-    require(
-      adapter.isBorrowable(address(this), _msgSender(), token, false, data),
-      "Not borrowable"
-    );
+    require(adapter.isBorrowable(address(this), _msgSender(), token, false, data), "Not borrowable");
     lends[_totalLend] = Lend({
       lender: _msgSender(),
       adapter: IAdapter(adapter),
@@ -270,7 +235,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     bool autoReRegister
   ) external {
     registerToLend(
-      erc721Adaper,
+      erc721Adapter,
       token,
       payment,
       pricePerSec,
@@ -290,7 +255,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     bool autoReRegister
   ) external {
     registerToLend(
-      erc1155Adaper,
+      erc1155Adapter,
       token,
       payment,
       pricePerSec,
@@ -345,14 +310,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     require(lend.lender == _msgSender(), "Not lender");
     require(rentContracts[lendId].renter == address(0), "Already rented");
 
-    AdapterCaller.cancelLendTransfer(
-      lend.adapter,
-      address(this),
-      _msgSender(),
-      lend.token,
-      lend.isLocked,
-      lend.data
-    );
+    AdapterCaller.cancelLendTransfer(lend.adapter, address(this), _msgSender(), lend.token, lend.isLocked, lend.data);
 
     emit LendCanceled(lendId, _msgSender());
 
@@ -362,6 +320,10 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
   function isBorrowable(uint96 lendId) external view returns (bool) {
     Lend memory lend = lends[lendId];
     return _isBorrowabe(lend);
+  }
+
+  function lendCount() external view returns (uint256) {
+    return _totalLend;
   }
 
   function lendCondition(
@@ -398,34 +360,18 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
   )
     external
     view
-    returns (
-      address payment,
-      uint120 pricePerSec,
-      uint120 totalPrice,
-      bool autoReRegister,
-      bytes memory data
-    )
+    returns (address payment, uint120 pricePerSec, uint120 totalPrice, bool autoReRegister, bytes memory data)
   {
     Lend memory lend = lends[lendId];
-    return (
-      address(lend.payment),
-      lend.pricePerSec,
-      lend.totalPrice,
-      lend.autoReRegister,
-      lend.data
-    );
+    return (address(lend.payment), lend.pricePerSec, lend.totalPrice, lend.autoReRegister, lend.data);
   }
 
-  function updateMinimalRentTime(
-    uint96 minimalRentTime_
-  ) external onlyRole(PROTOCOL_OWNER_ROLE) {
+  function updateMinimalRentTime(uint96 minimalRentTime_) external onlyRole(PROTOCOL_OWNER_ROLE) {
     emit MinimumRentTimeUpdated(minimalRentTime, minimalRentTime_);
     minimalRentTime = minimalRentTime_;
   }
 
-  function updateRentFee(
-    uint16 rentFee_
-  ) external onlyRole(PROTOCOL_OWNER_ROLE) {
+  function updateRentFee(uint16 rentFee_) external onlyRole(PROTOCOL_OWNER_ROLE) {
     _updateProtocolFee(rentFee_);
   }
 }
