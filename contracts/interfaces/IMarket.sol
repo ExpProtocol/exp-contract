@@ -53,6 +53,8 @@ interface IMarket is IAccessControlEnumerable {
     uint96 newMinimumRentTime
   );
 
+  event LendCanceled(uint96 indexed lendId, address indexed lender);
+
   function rent(uint96 lendId) external;
 
   function rentWithGuarantor(

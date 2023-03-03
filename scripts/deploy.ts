@@ -1,18 +1,30 @@
 import { ethers } from "hardhat";
 
 async function main() {
-  const currentTimestampInSeconds = Math.round(Date.now() / 1000);
-  const ONE_YEAR_IN_SECS = 365 * 24 * 60 * 60;
-  const unlockTime = currentTimestampInSeconds + ONE_YEAR_IN_SECS;
+  const Market = await ethers.getContractFactory("Market");
+  const market = await Market.deploy();
+  await market.deployed();
 
-  const lockedAmount = ethers.utils.parseEther("1");
+  const ERC721Adapter = await ethers.getContractFactory("ERC721Adapter");
+  const erc721Adapter = await ERC721Adapter.deploy();
+  await erc721Adapter.deployed();
 
-  const Lock = await ethers.getContractFactory("Lock");
-  const lock = await Lock.deploy(unlockTime, { value: lockedAmount });
+  const ERC1155Adapter = await ethers.getContractFactory("ERC1155Adapter");
+  const erc1155Adapter = await ERC1155Adapter.deploy();
+  await erc1155Adapter.deployed();
 
-  await lock.deployed();
+  const Periphery = await ethers.getContractFactory("Periphery");
+  const periphery = await Periphery.deploy(
+    market.address,
+    erc721Adapter.address,
+    erc1155Adapter.address
+  );
+  await periphery.deployed();
 
-  console.log(`Lock with 1 ETH and unlock timestamp ${unlockTime} deployed to ${lock.address}`);
+  console.log("Market deployed to:", market.address);
+  console.log("ERC721Adapter deployed to:", erc721Adapter.address);
+  console.log("ERC1155Adapter deployed to:", erc1155Adapter.address);
+  console.log("Periphery deployed to:", periphery.address);
 }
 
 // We recommend this pattern to be able to use async/await everywhere

@@ -304,6 +304,8 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
       lend.data
     );
 
+    emit LendCanceled(lendId, _msgSender());
+
     delete lends[lendId];
   }
 
