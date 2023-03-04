@@ -113,6 +113,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
 
     emit RentReturned(lendId, _msgSender(), lend.autoReRegister);
 
+    if (lend.isLocked == false) delete lends[lendId];
     delete rentContracts[lendId];
   }
 
@@ -121,6 +122,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     RentContract memory rentContract = rentContracts[lendId];
     uint96 rentTime = _blockTimeStamp() - rentContract.startTime;
     uint120 rentFee = rentTime * lend.pricePerSec;
+    require(rentContract.renter == address(0), "Already rentured");
     require(lend.lender == _msgSender(), "Not lender");
     require(rentFee > lend.totalPrice, "Not overtime");
 
