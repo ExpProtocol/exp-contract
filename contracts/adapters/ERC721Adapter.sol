@@ -27,7 +27,7 @@ contract ERC721Adapter is IAdapter {
 
   function isBorrowable(
     address market,
-    address,
+    address lender,
     address token,
     bool isLocked,
     bytes calldata data
@@ -36,7 +36,7 @@ contract ERC721Adapter is IAdapter {
     if (isLocked) {
       return IERC721(token).ownerOf(tokenId) == market;
     } else {
-      return IERC721(token).getApproved(tokenId) == market;
+      return IERC721(token).getApproved(tokenId) == market && IERC721(token).ownerOf(tokenId) == lender;
     }
   }
 
