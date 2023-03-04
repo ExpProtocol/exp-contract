@@ -4,6 +4,7 @@ pragma solidity ^0.8.9;
 import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Receiver.sol";
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "./interfaces/IMarket.sol";
 import "./interfaces/IAdapter.sol";
@@ -24,9 +25,9 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
   mapping(uint96 => RentContract) private rentContracts;
   mapping(address => uint24) public usedNonces;
 
-  bytes32 constant PROTOCOL_OWNER_ROLE = keccak256("PROTOCOL_OWNER_ROLE");
+  bytes32 public constant PROTOCOL_OWNER_ROLE = keccak256("PROTOCOL_OWNER_ROLE");
 
-  bytes32 constant GUARANTOR_REQUEST_TYPE_HASH =
+  bytes32 public constant GUARANTOR_REQUEST_TYPE_HASH =
     keccak256(
       abi.encodePacked(
         "GuarantorRequest(",

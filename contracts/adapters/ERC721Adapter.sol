@@ -3,6 +3,7 @@ pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "../interfaces/IAdapter.sol";
+import "hardhat/console.sol";
 
 contract ERC721Adapter is IAdapter {
   event ERC721LendRegistered(
@@ -41,35 +42,20 @@ contract ERC721Adapter is IAdapter {
 
   function logLend(
     uint96 lendId,
-    address market,
     address lender,
     address token,
     address payment,
     uint120 pricePerSec,
     uint120 totalPrice,
     bool autoReRegister,
-    bytes memory data
+    bytes calldata data
   ) external {
-    require(msg.sender == market, "Not market");
+    //require(msg.sender == market, "Not market");
     uint256 tokenId = abi.decode(data, (uint256));
-    emit ERC721LendRegistered(
-      lendId,
-      lender,
-      token,
-      payment,
-      tokenId,
-      pricePerSec,
-      totalPrice,
-      autoReRegister
-    );
+    emit ERC721LendRegistered(lendId, lender, token, payment, tokenId, pricePerSec, totalPrice, autoReRegister);
   }
 
-  function isReturnable(
-    address market,
-    address,
-    address token,
-    bytes calldata data
-  ) external view returns (bool) {
+  function isReturnable(address market, address, address token, bytes calldata data) external view returns (bool) {
     uint256 tokenId = abi.decode(data, (uint256));
     return IERC721(token).getApproved(tokenId) == market;
   }
@@ -83,10 +69,11 @@ contract ERC721Adapter is IAdapter {
     bytes calldata data
   ) external {
     uint256 tokenId = abi.decode(data, (uint256));
+
     if (isLocked) {
-      IERC721(token).safeTransferFrom(market, renter, tokenId);
+      IERC721(token).transferFrom(market, renter, tokenId);
     } else {
-      IERC721(token).safeTransferFrom(lender, renter, tokenId);
+      IERC721(token).transferFrom(lender, renter, tokenId);
     }
   }
 
@@ -99,7 +86,7 @@ contract ERC721Adapter is IAdapter {
   ) external {
     uint256 tokenId = abi.decode(data, (uint256));
     if (isLocked) {
-      IERC721(token).safeTransferFrom(market, lender, tokenId);
+      IERC721(token).transferFrom(market, lender, tokenId);
     }
   }
 
@@ -114,9 +101,9 @@ contract ERC721Adapter is IAdapter {
   ) external {
     uint256 tokenId = abi.decode(data, (uint256));
     if (autoReRegister) {
-      IERC721(token).safeTransferFrom(renter, market, tokenId);
+      IERC721(token).transferFrom(renter, market, tokenId);
     } else {
-      IERC721(token).safeTransferFrom(renter, lender, tokenId);
+      IERC721(token).transferFrom(renter, lender, tokenId);
     }
   }
 }

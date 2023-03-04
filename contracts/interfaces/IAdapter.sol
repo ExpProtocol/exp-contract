@@ -21,7 +21,6 @@ interface IAdapter {
 
   function logLend(
     uint96 lendId,
-    address market,
     //bytes32 lendIdAndMarket, //Optimize plan
     address lender,
     address token,
@@ -29,7 +28,7 @@ interface IAdapter {
     uint120 pricePerSec,
     uint120 totalPrice,
     bool autoReRegister,
-    bytes memory data
+    bytes calldata data
   ) external;
 
   function lendTransfer(

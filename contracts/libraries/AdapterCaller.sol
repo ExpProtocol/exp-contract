@@ -8,20 +8,20 @@ import "hardhat/console.sol";
 
 library AdapterCaller {
   function logLend(uint96 lendId, IMarket.Lend memory lend) internal {
-    (bool succsess, ) = address(lend.adapter).call(
+    (bool succsess, ) = address(lend.adapter).delegatecall(
       abi.encodeWithSelector(
         IAdapter.logLend.selector,
         lendId,
-        address(this),
         lend.lender,
         lend.token,
-        lend.payment,
+        address(lend.payment),
         lend.pricePerSec,
         lend.totalPrice,
         lend.autoReRegister,
         lend.data
       )
     );
+
     require(succsess, "AdapterCaller: logLend failed");
   }
 
@@ -35,15 +35,7 @@ library AdapterCaller {
     bytes memory data
   ) internal {
     (bool succsess, ) = address(adapter).delegatecall(
-      abi.encodeWithSelector(
-        IAdapter.lendTransfer.selector,
-        market,
-        lender,
-        token,
-        renter,
-        isLocked,
-        data
-      )
+      abi.encodeWithSelector(IAdapter.lendTransfer.selector, market, lender, token, renter, isLocked, data)
     );
     require(succsess, "AdapterCaller: lendTransfer failed");
   }
@@ -57,14 +49,7 @@ library AdapterCaller {
     bytes memory data
   ) internal {
     (bool succsess, ) = address(adapter).delegatecall(
-      abi.encodeWithSelector(
-        IAdapter.cancelLendTransfer.selector,
-        market,
-        lender,
-        token,
-        isLocked,
-        data
-      )
+      abi.encodeWithSelector(IAdapter.cancelLendTransfer.selector, market, lender, token, isLocked, data)
     );
 
     require(succsess, "AdapterCaller: cancelLendTransfer failed");

@@ -59,19 +59,16 @@ contract ERC1155Adapter is IAdapter {
 
   function logLend(
     uint96 lendId,
-    address market,
-    //bytes32 lendIdAndMarket, //Optimize plan
     address lender,
     address token,
     address payment,
     uint120 pricePerSec,
     uint120 totalPrice,
     bool autoReRegister,
-    bytes memory data
+    bytes calldata data // bytes memory data
   ) external {
-    require(msg.sender == market, "Not market");
+    //require(msg.sender == market, "Not market");
     DataFormat memory tokenData = abi.decode(data, (DataFormat));
-
     emit ERC1155LendRegistered(
       lendId,
       lender,
