@@ -466,7 +466,7 @@ describe("Market", function () {
         await erc721.approve(market.address, 1);
         await market.connect(owner).lend721(erc721.address, 1, erc20.address, 1, 100000, true);
 
-        await erc20.mint(otherAccount.address, 100000);
+        await erc20.mint(otherAccount.address, 200000);
         await erc20.connect(otherAccount).approve(market.address, 100000);
         await market.connect(otherAccount).rent(0);
 
