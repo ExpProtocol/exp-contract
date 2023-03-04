@@ -86,7 +86,7 @@ describe("Market", function () {
       });
       it("Should be able to update receiver", async () => {
         const { receiver, market } = await loadFixture(deployFull);
-        await expect(market.setReceiver(ethers.constants.AddressZero))
+        await expect(market.updateReceiver(ethers.constants.AddressZero))
           .to.emit(market, "ReceiverUpdated")
           .withArgs(receiver.address, ethers.constants.AddressZero);
         expect(await market.receiver()).to.equal(ethers.constants.AddressZero);
