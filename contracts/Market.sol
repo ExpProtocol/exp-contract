@@ -10,7 +10,6 @@ import "./interfaces/IMarket.sol";
 import "./interfaces/IAdapter.sol";
 import "./libraries/AdapterCaller.sol";
 import "./libraries/FeeManager.sol";
-import "./libraries/Receiver.sol";
 import "./adapters/ERC721Adapter.sol";
 import "./adapters/ERC1155Adapter.sol";
 import "hardhat/console.sol";
@@ -128,6 +127,8 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     uint256 totalPrice = lend.totalPrice;
     uint256 fee = _collectFee(lend.payment, totalPrice);
     IERC20(lend.payment).transfer(lend.lender, totalPrice - fee);
+
+    emit RentClaimed(0, _msgSender());
 
     delete rentContracts[lendId];
     delete lends[lendId];
@@ -284,46 +285,6 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
       totalPrice,
       autoReRegister,
       abi.encode(ERC1155Adapter.DataFormat(tokenId, amount))
-    );
-  }
-
-  function renewalLend(
-    uint96 lendId,
-    address payment,
-    uint120 pricePerSec,
-    uint120 totalPrice,
-    bool autoReRegister,
-    bytes calldata data
-  ) external {
-    Lend memory lend = lends[lendId];
-    require(lend.lender == _msgSender(), "Not lender");
-    require(rentContracts[lendId].renter == address(0), "Already rented");
-    require(lend.adapter.isValidData(data), "Invalid data");
-
-    lends[lendId] = Lend({
-      lender: _msgSender(),
-      adapter: lend.adapter,
-      token: lend.token,
-      payment: IERC20(payment),
-      pricePerSec: pricePerSec,
-      totalPrice: totalPrice,
-      isLocked: lend.isLocked,
-      autoReRegister: autoReRegister,
-      data: data
-    });
-
-    AdapterCaller.logLend(_totalLend, lends[_totalLend]);
-
-    emit LendRegistered(
-      lendId,
-      _msgSender(),
-      address(lend.adapter),
-      lend.token,
-      payment,
-      pricePerSec,
-      totalPrice,
-      autoReRegister,
-      data
     );
   }
 

@@ -8,7 +8,7 @@ describe("Market", function () {
   async function deployFull() {
     const [owner, otherAccount, guarantor] = await ethers.getSigners();
 
-    const Receiver = await ethers.getContractFactory("Receiver");
+    const Receiver = await ethers.getContractFactory("Only1155Receiver");
     const receiver = await Receiver.deploy();
     await receiver.deployed();
 
@@ -63,6 +63,7 @@ describe("Market", function () {
       expect(await market.protocolFee()).to.equal(20);
     });
   });
+
   describe("Misc", () => {
     describe("Update params", () => {
       it("Should be able to update minimal rent time", async () => {
@@ -95,6 +96,7 @@ describe("Market", function () {
       });
     });
   });
+
   describe("Lending", () => {
     describe("Lend", () => {
       it("should be able to register a 1155 token", async () => {
@@ -116,7 +118,76 @@ describe("Market", function () {
           .to.emit(market, "ERC721LendRegistered")
           .withArgs(0, owner.address, erc721.address, erc20.address, 1, 1, 100000, false);
       });
+
+      it("Should be able to cancel lend for 1155 token", async () => {
+        const { owner, market, erc20, erc1155 } = await loadFixture(deployFull);
+        await erc1155.mint(owner.address, 1, 100);
+        await erc1155.setApprovalForAll(market.address, true);
+        await market.connect(owner).lend1155(erc1155.address, 1, 1, erc20.address, 1, 100000, false);
+
+        await expect(market.connect(owner).cancelLend(0)).to.emit(market, "LendCanceled").withArgs(0, owner.address);
+        expect((await market.lendCondition(0)).lender).to.equal(ethers.constants.AddressZero);
+      });
+
+      it("Should be able cancel lend for 721 token", async () => {
+        const { owner, market, erc20, erc721 } = await loadFixture(deployFull);
+        await erc721.mint(owner.address, 1);
+        await erc721.approve(market.address, 1);
+        await market.connect(owner).lend721(erc721.address, 1, erc20.address, 1, 100000, false);
+
+        await expect(market.connect(owner).cancelLend(0)).to.emit(market, "LendCanceled").withArgs(0, owner.address);
+        expect((await market.lendCondition(0)).lender).to.equal(ethers.constants.AddressZero);
+      });
+
+      it("Should be able to cancel lend for locked 1155 token", async () => {
+        const { owner, otherAccount, market, erc20, erc1155 } = await loadFixture(deployFull);
+        await erc1155.mint(owner.address, 1, 100);
+        await erc1155.setApprovalForAll(market.address, true);
+        await market.connect(owner).lend1155(erc1155.address, 1, 1, erc20.address, 1, 100000, true);
+
+        await erc20.mint(otherAccount.address, 200000);
+        await erc20.connect(otherAccount).approve(market.address, 100000);
+        await market.connect(otherAccount).rent(0);
+
+        await erc1155.connect(otherAccount).setApprovalForAll(market.address, true);
+        await market.connect(otherAccount).returnToken(0);
+
+        await expect(market.connect(owner).cancelLend(0))
+          .to.emit(market, "LendCanceled")
+          .withArgs(0, owner.address)
+          .to.emit(erc1155, "TransferSingle")
+          .withArgs(market.address, market.address, owner.address, 1, 1);
+
+        expect((await market.lendCondition(0)).lender).to.equal(ethers.constants.AddressZero);
+        expect(await erc1155.balanceOf(owner.address, 1)).to.equal(100);
+        expect(await erc1155.balanceOf(market.address, 1)).to.equal(0);
+      });
+
+      it("Should be able to cancel lend for locked 721 token", async () => {
+        const { owner, otherAccount, market, erc20, erc721 } = await loadFixture(deployFull);
+        await erc721.mint(owner.address, 1);
+        await erc721.approve(market.address, 1);
+        await market.connect(owner).lend721(erc721.address, 1, erc20.address, 1, 100000, true);
+
+        await erc20.mint(otherAccount.address, 200000);
+        await erc20.connect(otherAccount).approve(market.address, 100000);
+        await market.connect(otherAccount).rent(0);
+
+        await erc721.connect(otherAccount).approve(market.address, 1);
+        await market.connect(otherAccount).returnToken(0);
+
+        await expect(market.connect(owner).cancelLend(0))
+          .to.emit(market, "LendCanceled")
+          .withArgs(0, owner.address)
+          .to.emit(erc721, "Transfer")
+          .withArgs(market.address, owner.address, 1);
+
+        expect((await market.lendCondition(0)).lender).to.equal(ethers.constants.AddressZero);
+        expect(await erc721.ownerOf(1)).to.equal(owner.address);
+        expect(await erc721.balanceOf(market.address)).to.equal(0);
+      });
     });
+
     describe("View", () => {
       it("Should be able to get lend data", async () => {
         const { owner, market, erc20, erc1155, erc1155Adapter } = await loadFixture(deployFull);
@@ -511,6 +582,7 @@ describe("Market", function () {
         await market.connect(otherAccount).rent(0);
 
         await time.increase(100000);
+
         await erc721.connect(otherAccount).approve(market.address, 1);
         await expect(market.connect(otherAccount).returnToken(0)).to.revertedWith("Already overtime");
       });
@@ -528,6 +600,31 @@ describe("Market", function () {
       });
     });
   });
+
+  describe("Claim", () => {
+    it("Should be claim after overtime", async () => {
+      const { owner, otherAccount, market, erc20, erc721 } = await loadFixture(deployFull);
+      await erc721.mint(owner.address, 1);
+      await erc721.approve(market.address, 1);
+      await market.connect(owner).lend721(erc721.address, 1, erc20.address, 1, 100000, false);
+
+      await erc20.mint(otherAccount.address, 100000);
+      await erc20.connect(otherAccount).approve(market.address, 100000);
+      await market.connect(otherAccount).rent(0);
+
+      await time.increase(100000);
+
+      await expect(market.connect(owner).claim(0))
+        .to.emit(erc20, "Transfer")
+        .withArgs(market.address, owner.address, 95000)
+        .to.emit(market, "RentClaimed")
+        .withArgs(0, owner.address);
+
+      expect(await erc20.balanceOf(owner.address)).to.equal(95000);
+      expect(await erc20.balanceOf(market.address)).to.equal(5000);
+    });
+  });
+
   describe("Fee", () => {
     it("should be able to claim a fee", async () => {
       const { owner, otherAccount, market, erc20, erc721 } = await loadFixture(deployFull);

@@ -48,6 +48,8 @@ interface IMarket is IAccessControlEnumerable {
 
   event RentReturned(uint96 indexed lendId, address indexed renter, bool autoReRegister);
 
+  event RentClaimed(uint96 indexed lendId, address indexed lender);
+
   event LendCanceled(uint96 indexed lendId, address indexed lender);
 
   event MinimumRentTimeUpdated(uint96 oldMinimumRentTime, uint96 newMinimumRentTime);
@@ -73,15 +75,6 @@ interface IMarket is IAccessControlEnumerable {
   function registerToLend(
     IAdapter adapter,
     address token,
-    address payment,
-    uint120 pricePerSec,
-    uint120 totalPrice,
-    bool autoReRegister,
-    bytes calldata data
-  ) external;
-
-  function renewalLend(
-    uint96 lendId,
     address payment,
     uint120 pricePerSec,
     uint120 totalPrice,
