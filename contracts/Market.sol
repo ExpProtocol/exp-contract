@@ -26,7 +26,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
   mapping(uint96 => RentContract) private rentContracts;
   mapping(address => uint24) public usedNonces;
   mapping(bytes4 => bool) private supportedInterfaces;
-  mapping(bytes4 => bool) private receiverSelectors;
+  mapping(bytes4 => bool) private supportedReceiveSelectors;
 
   bytes32 public constant PROTOCOL_OWNER_ROLE = keccak256("PROTOCOL_OWNER_ROLE");
 
@@ -358,13 +358,22 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     _updateProtocolFee(rentFee_);
   }
 
-  function setReceiverSelector(bytes4 selector, bool supported) external onlyRole(PROTOCOL_OWNER_ROLE) {
-    emit ReceiverSelectorUpdated(selector, supported);
-    receiverSelectors[selector] = supported;
+  function setReceiver(address receiver_) external onlyRole(PROTOCOL_OWNER_ROLE) {
+    emit ReceiverUpdated(receiver, receiver_);
+    receiver = receiver_;
+  }
+
+  function setSupportedReceiveSelector(bytes4 selector, bool supported) external onlyRole(PROTOCOL_OWNER_ROLE) {
+    emit SupportedReceiveSelectorUpdated(selector, supported);
+    supportedReceiveSelectors[selector] = supported;
+  }
+
+  function supportsReceiveSelector(bytes4 selector) external view returns (bool) {
+    return supportedReceiveSelectors[selector];
   }
 
   function setSupportedInterface(bytes4 interfaceId, bool supported) external onlyRole(PROTOCOL_OWNER_ROLE) {
-    emit SupportInterfaceIdUpdated(interfaceId, supported);
+    emit SupportedInterfaceIdUpdated(interfaceId, supported);
     supportedInterfaces[interfaceId] = supported;
   }
 
@@ -377,7 +386,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
   }
 
   fallback(bytes calldata call) external payable returns (bytes memory) {
-    require(receiverSelectors[msg.sig], "Not supported receiver selector");
+    require(supportedReceiveSelectors[msg.sig], "Not supported receiver selector");
     (bool success, bytes memory data) = address(receiver).delegatecall(call);
     require(success, "Receiver call failed");
     return data;

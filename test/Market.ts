@@ -24,8 +24,8 @@ describe("Market", function () {
     const market = await Market.deploy(receiver.address, erc721Adapter.address, erc1155Adapter.address);
     await market.deployed();
 
-    await market.setReceiverSelector(receiver.interface.getSighash("onERC1155Received"), true);
-    await market.setReceiverSelector(receiver.interface.getSighash("onERC1155BatchReceived"), true);
+    await market.setSupportedReceiveSelector(receiver.interface.getSighash("onERC1155Received"), true);
+    await market.setSupportedReceiveSelector(receiver.interface.getSighash("onERC1155BatchReceived"), true);
 
     const Erc20 = await ethers.getContractFactory("Test20Token");
     const erc20 = await Erc20.deploy();
@@ -44,6 +44,7 @@ describe("Market", function () {
       otherAccount,
       guarantor,
       market,
+      receiver,
       erc721Adapter,
       erc1155Adapter,
       erc20,
@@ -75,6 +76,27 @@ describe("Market", function () {
         const { market } = await loadFixture(deployFull);
         await expect(market.updateRentFee(1)).to.emit(market, "ProtocolFeeUpdated").withArgs(20, 1);
         expect(await market.protocolFee()).to.equal(1);
+      });
+      it("Should be able to update supported interface", async () => {
+        const { market } = await loadFixture(deployFull);
+        await expect(market.setSupportedInterface("0x00000001", true))
+          .to.emit(market, "SupportedInterfaceIdUpdated")
+          .withArgs("0x00000001", true);
+        expect(await market.supportsInterface("0x00000001")).to.equal(true);
+      });
+      it("Should be able to update receiver", async () => {
+        const { receiver, market } = await loadFixture(deployFull);
+        await expect(market.setReceiver(ethers.constants.AddressZero))
+          .to.emit(market, "ReceiverUpdated")
+          .withArgs(receiver.address, ethers.constants.AddressZero);
+        expect(await market.receiver()).to.equal(ethers.constants.AddressZero);
+      });
+      it("Should be able to update receiver selector", async () => {
+        const { market } = await loadFixture(deployFull);
+        await expect(market.setSupportedReceiveSelector("0x00000001", true))
+          .to.emit(market, "SupportedReceiveSelectorUpdated")
+          .withArgs("0x00000001", true);
+        expect(await market.supportsReceiveSelector("0x00000001")).to.equal(true);
       });
     });
     describe("Role", () => {

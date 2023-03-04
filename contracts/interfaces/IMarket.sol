@@ -54,9 +54,11 @@ interface IMarket is IAccessControlEnumerable {
 
   event MinimumRentTimeUpdated(uint96 oldMinimumRentTime, uint96 newMinimumRentTime);
 
-  event SupportInterfaceIdUpdated(bytes4 interfaceId, bool supported);
+  event SupportedInterfaceIdUpdated(bytes4 interfaceId, bool supported);
 
-  event ReceiverSelectorUpdated(bytes4 selector, bool supported);
+  event SupportedReceiveSelectorUpdated(bytes4 selector, bool supported);
+
+  event ReceiverUpdated(address oldReceiver, address newReceiver);
 
   function rent(uint96 lendId) external;
 
