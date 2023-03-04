@@ -10,11 +10,13 @@ import "./interfaces/IMarket.sol";
 import "./interfaces/IAdapter.sol";
 import "./libraries/AdapterCaller.sol";
 import "./libraries/FeeManager.sol";
+import "./libraries/Receiver.sol";
 import "./adapters/ERC721Adapter.sol";
 import "./adapters/ERC1155Adapter.sol";
 import "hardhat/console.sol";
 
 contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
+  address public receiver;
   ERC721Adapter public erc721Adapter;
   ERC1155Adapter public erc1155Adapter;
 
@@ -24,6 +26,8 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
   mapping(uint96 => Lend) private lends;
   mapping(uint96 => RentContract) private rentContracts;
   mapping(address => uint24) public usedNonces;
+  mapping(bytes4 => bool) private supportedInterfaces;
+  mapping(bytes4 => bool) private receiverSelectors;
 
   bytes32 public constant PROTOCOL_OWNER_ROLE = keccak256("PROTOCOL_OWNER_ROLE");
 
@@ -40,13 +44,18 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
       )
     );
 
-  constructor(address erc721Adapter_, address erc1155Adapter_) EIP712("EXP-Market", "1") {
+  constructor(address receiver_, address erc721Adapter_, address erc1155Adapter_) EIP712("EXP-Market", "1") {
     _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
     _setupRole(PROTOCOL_OWNER_ROLE, _msgSender());
     _setupRole(TREASURY_ROLE, _msgSender());
 
+    receiver = receiver_;
     erc721Adapter = ERC721Adapter(erc721Adapter_);
     erc1155Adapter = ERC1155Adapter(erc1155Adapter_);
+
+    supportedInterfaces[type(IERC165).interfaceId] = true;
+    supportedInterfaces[type(IAccessControl).interfaceId] = true;
+    supportedInterfaces[type(IAccessControlEnumerable).interfaceId] = true;
   }
 
   function _blockTimeStamp() private view returns (uint96) {
@@ -74,7 +83,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     require(lend.totalPrice > rentFee, "Already overtime");
     require(_isReturnable(lendId), "Not returnable");
 
-    AdapterCaller.returnTransfer(
+    lend.isLocked = AdapterCaller.returnTransfer(
       lend.adapter,
       address(this),
       lend.lender,
@@ -84,8 +93,6 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
       lend.autoReRegister,
       lend.data
     );
-
-    lend.isLocked = lend.autoReRegister; //Check Lock Flag;
 
     uint120 totalReturn = lend.totalPrice - rentFee;
     if (rentContract.guarantor == address(0)) {
@@ -388,5 +395,30 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
 
   function updateRentFee(uint16 rentFee_) external onlyRole(PROTOCOL_OWNER_ROLE) {
     _updateProtocolFee(rentFee_);
+  }
+
+  function setReceiverSelector(bytes4 selector, bool supported) external onlyRole(PROTOCOL_OWNER_ROLE) {
+    emit ReceiverSelectorUpdated(selector, supported);
+    receiverSelectors[selector] = supported;
+  }
+
+  function setSupportedInterface(bytes4 interfaceId, bool supported) external onlyRole(PROTOCOL_OWNER_ROLE) {
+    emit SupportInterfaceIdUpdated(interfaceId, supported);
+    supportedInterfaces[interfaceId] = supported;
+  }
+
+  function supportsInterface(bytes4 interfaceId) public view virtual override(AccessControlEnumerable) returns (bool) {
+    return supportedInterfaces[interfaceId];
+  }
+
+  receive() external payable {
+    revert("Not supported");
+  }
+
+  fallback(bytes calldata call) external payable returns (bytes memory) {
+    require(receiverSelectors[msg.sig], "Not supported receiver selector");
+    (bool success, bytes memory data) = address(receiver).delegatecall(call);
+    require(success, "Receiver call failed");
+    return data;
   }
 }

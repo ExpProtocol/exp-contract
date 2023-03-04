@@ -64,8 +64,8 @@ library AdapterCaller {
     bool isLocked,
     bool autoReRegister,
     bytes memory data
-  ) internal {
-    (bool succsess, ) = address(adapter).delegatecall(
+  ) internal returns (bool isReRegistered) {
+    (bool succsess, bytes memory result) = address(adapter).delegatecall(
       abi.encodeWithSelector(
         IAdapter.returnTransfer.selector,
         market,
@@ -79,5 +79,7 @@ library AdapterCaller {
     );
 
     require(succsess, "AdapterCaller: returnTransfer failed");
+
+    isReRegistered = abi.decode(result, (bool));
   }
 }

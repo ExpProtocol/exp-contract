@@ -8,6 +8,10 @@ describe("Market", function () {
   async function deployFull() {
     const [owner, otherAccount, guarantor] = await ethers.getSigners();
 
+    const Receiver = await ethers.getContractFactory("Receiver");
+    const receiver = await Receiver.deploy();
+    await receiver.deployed();
+
     const ERC721Adapter = await ethers.getContractFactory("ERC721Adapter");
     const erc721Adapter = await ERC721Adapter.deploy();
     await erc721Adapter.deployed();
@@ -17,8 +21,11 @@ describe("Market", function () {
     await erc1155Adapter.deployed();
 
     const Market = await ethers.getContractFactory("TestMarket");
-    const market = await Market.deploy(erc721Adapter.address, erc1155Adapter.address);
+    const market = await Market.deploy(receiver.address, erc721Adapter.address, erc1155Adapter.address);
     await market.deployed();
+
+    await market.setReceiverSelector(receiver.interface.getSighash("onERC1155Received"), true);
+    await market.setReceiverSelector(receiver.interface.getSighash("onERC1155BatchReceived"), true);
 
     const Erc20 = await ethers.getContractFactory("Test20Token");
     const erc20 = await Erc20.deploy();
@@ -160,8 +167,8 @@ describe("Market", function () {
 
         await erc20.mint(otherAccount.address, 100000);
         await erc20.connect(otherAccount).approve(market.address, 100000);
-        const tx = market.connect(otherAccount).rent(0);
-        await expect(tx)
+
+        await expect(market.connect(otherAccount).rent(0))
           .to.emit(market, "RentStarted")
           .withArgs(0, otherAccount.address, ethers.constants.AddressZero, 0, 0)
           .to.emit(erc721, "Transfer")
@@ -396,21 +403,21 @@ describe("Market", function () {
         expect(await erc20.balanceOf(market.address)).to.equal(8640);
       });
 
-      // it("Should be able to lock 1155 after return", async () => {
-      //   const { owner, otherAccount, market, erc20, erc1155 } = await loadFixture(deployFull);
-      //   await erc1155.mint(owner.address, 1, 100);
-      //   await erc1155.setApprovalForAll(market.address, true);
-      //   await market.connect(owner).lend1155(erc1155.address, 1, 1, erc20.address, 1, 100000, true);
+      it("Should be able to lock 1155 after return", async () => {
+        const { owner, otherAccount, market, erc20, erc1155 } = await loadFixture(deployFull);
+        await erc1155.mint(owner.address, 1, 100);
+        await erc1155.setApprovalForAll(market.address, true);
+        await market.connect(owner).lend1155(erc1155.address, 1, 1, erc20.address, 1, 100000, true);
 
-      //   await erc20.mint(otherAccount.address, 100000);
-      //   await erc20.connect(otherAccount).approve(market.address, 100000);
-      //   await market.connect(otherAccount).rent(0);
+        await erc20.mint(otherAccount.address, 100000);
+        await erc20.connect(otherAccount).approve(market.address, 100000);
+        await market.connect(otherAccount).rent(0);
 
-      //   await erc1155.connect(otherAccount).setApprovalForAll(market.address, true);
-      //   await market.connect(otherAccount).returnToken(0);
+        await erc1155.connect(otherAccount).setApprovalForAll(market.address, true);
+        await market.connect(otherAccount).returnToken(0);
 
-      //   expect(await erc1155.balanceOf(market.address, 1)).to.equal(1);
-      // });
+        expect(await erc1155.balanceOf(market.address, 1)).to.equal(1);
+      });
 
       it("Should be able to lock 721 after return", async () => {
         const { owner, otherAccount, market, erc20, erc721 } = await loadFixture(deployFull);
@@ -426,6 +433,54 @@ describe("Market", function () {
         await market.connect(otherAccount).returnToken(0);
 
         expect(await erc721.balanceOf(market.address)).to.equal(1);
+      });
+    });
+
+    describe("Rent Locked Token", () => {
+      it("Should be able to rent a locked 1155 token", async () => {
+        const { owner, otherAccount, market, erc20, erc1155 } = await loadFixture(deployFull);
+        await erc1155.mint(owner.address, 1, 100);
+        await erc1155.setApprovalForAll(market.address, true);
+        await market.connect(owner).lend1155(erc1155.address, 1, 1, erc20.address, 1, 100000, true);
+
+        await erc20.mint(otherAccount.address, 200000);
+        await erc20.connect(otherAccount).approve(market.address, 100000);
+        await market.connect(otherAccount).rent(0);
+
+        await erc1155.connect(otherAccount).setApprovalForAll(market.address, true);
+        await market.connect(otherAccount).returnToken(0);
+
+        await erc20.connect(otherAccount).approve(market.address, 100000);
+        await expect(market.connect(otherAccount).rent(0))
+          .to.emit(market, "RentStarted")
+          .withArgs(0, otherAccount.address, ethers.constants.AddressZero, 0, 0)
+          .to.emit(erc1155, "TransferSingle")
+          .withArgs(market.address, market.address, otherAccount.address, 1, 1)
+          .to.emit(erc20, "Transfer")
+          .withArgs(otherAccount.address, market.address, 100000);
+      });
+
+      it("Should able to rent a locked 721 token", async () => {
+        const { owner, otherAccount, market, erc20, erc721 } = await loadFixture(deployFull);
+        await erc721.mint(owner.address, 1);
+        await erc721.approve(market.address, 1);
+        await market.connect(owner).lend721(erc721.address, 1, erc20.address, 1, 100000, true);
+
+        await erc20.mint(otherAccount.address, 100000);
+        await erc20.connect(otherAccount).approve(market.address, 100000);
+        await market.connect(otherAccount).rent(0);
+
+        await erc721.connect(otherAccount).approve(market.address, 1);
+        await market.connect(otherAccount).returnToken(0);
+
+        await erc20.connect(otherAccount).approve(market.address, 100000);
+        await expect(market.connect(otherAccount).rent(0))
+          .to.emit(market, "RentStarted")
+          .withArgs(0, otherAccount.address, ethers.constants.AddressZero, 0, 0)
+          .to.emit(erc721, "Transfer")
+          .withArgs(market.address, otherAccount.address, 1)
+          .to.emit(erc20, "Transfer")
+          .withArgs(otherAccount.address, market.address, 100000);
       });
     });
 

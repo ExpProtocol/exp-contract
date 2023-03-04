@@ -98,12 +98,13 @@ contract ERC721Adapter is IAdapter {
     bool,
     bool autoReRegister,
     bytes calldata data
-  ) external {
+  ) external returns (bool) {
     uint256 tokenId = abi.decode(data, (uint256));
     if (autoReRegister) {
       IERC721(token).transferFrom(renter, market, tokenId);
     } else {
       IERC721(token).transferFrom(renter, lender, tokenId);
     }
+    return autoReRegister;
   }
 }

@@ -56,5 +56,5 @@ interface IAdapter {
     bool isLocked,
     bool autoReRegister,
     bytes calldata data
-  ) external;
+  ) external returns (bool isReRegistered);
 }

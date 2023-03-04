@@ -27,5 +27,9 @@ contract TestMarket is Market {
     bool autoReRegister
   );
 
-  constructor(address erc721Adapter_, address erc1155Adapter_) Market(erc721Adapter_, erc1155Adapter_) {}
+  constructor(
+    address receiver_,
+    address erc721Adapter_,
+    address erc1155Adapter_
+  ) Market(receiver_, erc721Adapter_, erc1155Adapter_) {}
 }

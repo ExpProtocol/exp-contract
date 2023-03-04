@@ -119,12 +119,13 @@ contract ERC1155Adapter is IAdapter {
     bool,
     bool autoReRegister,
     bytes calldata data
-  ) external {
+  ) external returns (bool) {
     DataFormat memory tokenData = abi.decode(data, (DataFormat));
     if (autoReRegister) {
       IERC1155(token).safeTransferFrom(renter, market, tokenData.tokenId, tokenData.amount, "");
     } else {
       IERC1155(token).safeTransferFrom(renter, lender, tokenData.tokenId, tokenData.amount, "");
     }
+    return autoReRegister;
   }
 }
