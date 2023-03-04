@@ -60,6 +60,8 @@ interface IMarket is IAccessControlEnumerable {
 
   event ReceiverUpdated(address oldReceiver, address newReceiver);
 
+  event AdaptersUpdated(address old721adapter, address new721adapter, address old1155adapter, address new1155adapter);
+
   function rent(uint96 lendId) external;
 
   function rentWithGuarantor(

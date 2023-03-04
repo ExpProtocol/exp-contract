@@ -358,7 +358,13 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     _updateProtocolFee(rentFee_);
   }
 
-  function setReceiver(address receiver_) external onlyRole(PROTOCOL_OWNER_ROLE) {
+  function updateAdapters(address erc721Adapter_, address erc1155Adapter_) external onlyRole(PROTOCOL_OWNER_ROLE) {
+    emit AdaptersUpdated(address(erc721Adapter), address(erc1155Adapter), erc721Adapter_, erc1155Adapter_);
+    erc721Adapter = ERC721Adapter(erc721Adapter_);
+    erc1155Adapter = ERC1155Adapter(erc1155Adapter_);
+  }
+
+  function updateReceiver(address receiver_) external onlyRole(PROTOCOL_OWNER_ROLE) {
     emit ReceiverUpdated(receiver, receiver_);
     receiver = receiver_;
   }
