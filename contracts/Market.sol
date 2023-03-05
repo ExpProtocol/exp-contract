@@ -171,7 +171,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
 
     _rent(lendId, lend, address(0), 0, 0);
 
-    emit RentStarted(lendId, _msgSender(), address(0), 0, 0);
+    emit RentStarted(lendId, _msgSender(), _blockTimeStamp(), address(0), 0, 0);
   }
 
   function rentWithGuarantor(
@@ -205,7 +205,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     lend.payment.transferFrom(_msgSender(), address(this), rentPrice);
     lend.payment.transferFrom(guarantor, address(this), guarantorBalance);
 
-    emit RentStarted(lendId, _msgSender(), guarantor, guarantorBalance, guarantorFee);
+    emit RentStarted(lendId, _msgSender(), _blockTimeStamp(), guarantor, guarantorBalance, guarantorFee);
 
     _rent(lendId, lend, guarantor, guarantorBalance, guarantorFee);
     usedNonces[guarantor]++;
@@ -345,10 +345,16 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
   )
     external
     view
-    returns (address payment, uint120 pricePerSec, uint120 totalPrice, bool autoReRegister, bytes memory data)
+    returns (address renter, uint96 startTime, address guarantor, uint120 guarantorBalance, uint16 guarantorFee)
   {
-    Lend memory lend = lends[lendId];
-    return (address(lend.payment), lend.pricePerSec, lend.totalPrice, lend.autoReRegister, lend.data);
+    RentContract memory rentContract = rentContracts[lendId];
+    return (
+      rentContract.renter,
+      rentContract.startTime,
+      rentContract.guarantor,
+      rentContract.guarantorBalance,
+      rentContract.guarantorFee
+    );
   }
 
   function updateMinimalRentTime(uint96 minimalRentTime_) external onlyRole(PROTOCOL_OWNER_ROLE) {

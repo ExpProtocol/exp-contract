@@ -41,6 +41,7 @@ interface IMarket is IAccessControlEnumerable {
   event RentStarted(
     uint96 indexed lendId,
     address indexed renter,
+    uint96 startTime,
     address indexed guarantor,
     uint120 guarantorBalance,
     uint16 guarantorFee
@@ -115,5 +116,5 @@ interface IMarket is IAccessControlEnumerable {
   )
     external
     view
-    returns (address payment, uint120 pricePerSec, uint120 totalPrice, bool autoReRegister, bytes memory data);
+    returns (address renter, uint96 startTime, address guarantor, uint120 guarantorBalance, uint16 guarantorFee);
 }
