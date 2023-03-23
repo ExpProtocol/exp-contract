@@ -1,6 +1,7 @@
 import { anyUint } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
 import { loadFixture, time } from "@nomicfoundation/hardhat-network-helpers";
-import { expect } from "chai";
+import { expect, should } from "chai";
+import { BigNumber } from "ethers";
 import { ethers } from "hardhat";
 import { missingRole, to1155Data } from "./utils";
 
@@ -240,7 +241,7 @@ describe("Market", function () {
         await erc20.connect(otherAccount).approve(market.address, 100000);
         await expect(market.connect(otherAccount).rent(0))
           .to.emit(market, "RentStarted")
-          .withArgs(0, otherAccount.address, ethers.constants.AddressZero, 0, 0)
+          .withArgs(0, otherAccount.address, Number, ethers.constants.AddressZero, 0, 0)
           .to.emit(erc1155, "TransferSingle")
           .withArgs(market.address, owner.address, otherAccount.address, 1, 1)
           .to.emit(erc20, "Transfer")
@@ -263,7 +264,7 @@ describe("Market", function () {
 
         await expect(market.connect(otherAccount).rent(0))
           .to.emit(market, "RentStarted")
-          .withArgs(0, otherAccount.address, ethers.constants.AddressZero, 0, 0)
+          .withArgs(0, otherAccount.address, Number, ethers.constants.AddressZero, 0, 0)
           .to.emit(erc721, "Transfer")
           .withArgs(owner.address, otherAccount.address, 1)
           .to.emit(erc20, "Transfer")
@@ -314,7 +315,7 @@ describe("Market", function () {
         await erc20.connect(guarantor).approve(market.address, 50000);
         await expect(market.connect(otherAccount).rentWithGuarantor(0, guarantor.address, 50000, 20, signature))
           .to.emit(market, "RentStarted")
-          .withArgs(0, otherAccount.address, guarantor.address, 50000, 20)
+          .withArgs(0, otherAccount.address, Number, guarantor.address, 50000, 20)
           .to.emit(erc721, "Transfer")
           .withArgs(owner.address, otherAccount.address, 1)
           .to.emit(erc20, "Transfer")
@@ -546,7 +547,7 @@ describe("Market", function () {
         await erc20.connect(otherAccount).approve(market.address, 100000);
         await expect(market.connect(otherAccount).rent(0))
           .to.emit(market, "RentStarted")
-          .withArgs(0, otherAccount.address, ethers.constants.AddressZero, 0, 0)
+          .withArgs(0, otherAccount.address, Number, ethers.constants.AddressZero, 0, 0)
           .to.emit(erc1155, "TransferSingle")
           .withArgs(market.address, market.address, otherAccount.address, 1, 1)
           .to.emit(erc20, "Transfer")
@@ -569,7 +570,7 @@ describe("Market", function () {
         await erc20.connect(otherAccount).approve(market.address, 100000);
         await expect(market.connect(otherAccount).rent(0))
           .to.emit(market, "RentStarted")
-          .withArgs(0, otherAccount.address, ethers.constants.AddressZero, 0, 0)
+          .withArgs(0, otherAccount.address, Number, ethers.constants.AddressZero, 0, 0)
           .to.emit(erc721, "Transfer")
           .withArgs(market.address, otherAccount.address, 1)
           .to.emit(erc20, "Transfer")
@@ -588,7 +589,9 @@ describe("Market", function () {
         await erc20.connect(otherAccount).approve(market.address, 100000);
         await market.connect(otherAccount).rent(0);
 
-        expect(await market.rentCondition(0)).to.deep.equal([erc20.address, 1, 100000, false, to1155Data(1, 1)]);
+        const [renter, timestamp, ...otherData] = await market.rentCondition(0);
+        expect([renter, ...otherData]).to.deep.equal([otherAccount.address, ethers.constants.AddressZero, 0, 0]);
+        expect(timestamp).to.be.closeTo(Number(await time.latest()), 100);
       });
     });
 

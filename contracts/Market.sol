@@ -25,6 +25,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
   mapping(uint96 => Lend) private lends;
   mapping(uint96 => RentContract) private rentContracts;
   mapping(address => uint24) public usedNonces;
+  mapping(address => bool) public allowedAddapters;
   mapping(bytes4 => bool) private supportedInterfaces;
   mapping(bytes4 => bool) private supportedReceiveSelectors;
 
@@ -51,6 +52,9 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     receiver = receiver_;
     erc721Adapter = ERC721Adapter(erc721Adapter_);
     erc1155Adapter = ERC1155Adapter(erc1155Adapter_);
+
+    allowedAddapters[address(erc721Adapter)] = true;
+    allowedAddapters[address(erc1155Adapter)] = true;
 
     supportedInterfaces[type(IERC165).interfaceId] = true;
     supportedInterfaces[type(IAccessControl).interfaceId] = true;
@@ -122,7 +126,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     RentContract memory rentContract = rentContracts[lendId];
     uint96 rentTime = _blockTimeStamp() - rentContract.startTime;
     uint120 rentFee = rentTime * lend.pricePerSec;
-    require(rentContract.renter == address(0), "Already rentured");
+    require(rentContract.renter != address(0), "Already rentured");
     require(lend.lender == _msgSender(), "Not lender");
     require(rentFee > lend.totalPrice, "Not overtime");
 
@@ -220,6 +224,7 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
     bool autoReRegister,
     bytes memory data
   ) public {
+    require(allowedAddapters[address(adapter)], "Adapter not found");
     require(adapter.isValidData(data), "Invalid data");
     require(adapter.isBorrowable(address(this), _msgSender(), token, false, data), "Not borrowable");
     lends[_totalLend] = Lend({
@@ -375,6 +380,11 @@ contract Market is IMarket, AccessControlEnumerable, EIP712, FeeManager {
   function updateReceiver(address receiver_) external onlyRole(PROTOCOL_OWNER_ROLE) {
     emit ReceiverUpdated(receiver, receiver_);
     receiver = receiver_;
+  }
+
+  function setAllowedAdapter(address adapter, bool allowed) external onlyRole(PROTOCOL_OWNER_ROLE) {
+    emit AllowedAdapterUpdated(adapter, allowed);
+    allowedAddapters[adapter] = allowed;
   }
 
   function setSupportedReceiveSelector(bytes4 selector, bool supported) external onlyRole(PROTOCOL_OWNER_ROLE) {
